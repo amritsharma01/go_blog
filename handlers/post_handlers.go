@@ -62,15 +62,54 @@ func (h *PostHandler) CreatePost(c echo.Context) error {
 	return c.JSON(http.StatusCreated, post)
 }
 
+// List all posts with pagination
 func (h *PostHandler) GetPosts(c echo.Context) error {
 	var posts []models.Post
 
+	// Get pagination parameters from the query string
+	page := c.QueryParam("page")
+	limit := c.QueryParam("limit")
+
+	// Default values for pagination
+	pageNum := 1
+	limitNum := 10
+
+	// Parse page and limit if provided
+	if page != "" {
+		parsedPage, err := strconv.Atoi(page)
+		if err == nil && parsedPage > 0 {
+			pageNum = parsedPage
+		}
+	}
+
+	if limit != "" {
+		parsedLimit, err := strconv.Atoi(limit)
+		if err == nil && parsedLimit > 0 {
+			limitNum = parsedLimit
+		}
+	}
+
+	// Calculate the offset based on the current page
+	offset := (pageNum - 1) * limitNum
+
 	// Preload the Author data for each post
-	if err := h.DB.Preload("Author").Find(&posts).Error; err != nil {
+	if err := h.DB.Limit(limitNum).Offset(offset).Preload("Author").Find(&posts).Error; err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"message": "Failed to retrieve posts"})
 	}
 
-	return c.JSON(http.StatusOK, posts)
+	// Optionally, return total count for pagination metadata
+	var totalPosts int64
+	if err := h.DB.Model(&models.Post{}).Count(&totalPosts).Error; err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"message": "Failed to count posts"})
+	}
+
+	return c.JSON(http.StatusOK, echo.Map{
+		"data":       posts,
+		"page":       pageNum,
+		"limit":      limitNum,
+		"total":      totalPosts,
+		"totalPages": int(totalPosts / int64(limitNum)),
+	})
 }
 
 func (h *PostHandler) PostDetails(c echo.Context) error {
@@ -131,8 +170,8 @@ func (h *PostHandler) PostEdit(c echo.Context) error {
 	return c.JSON(http.StatusOK, post)
 }
 
+// Get posts by author with pagination
 func (h *PostHandler) GetPostsbyAuthor(c echo.Context) error {
-
 	authorID := c.Param("author_id")
 
 	// Convert author_id to uint (assuming it's a numeric value)
@@ -143,15 +182,51 @@ func (h *PostHandler) GetPostsbyAuthor(c echo.Context) error {
 		})
 	}
 
+	// Get pagination parameters from the query string
+	page := c.QueryParam("page")
+	limit := c.QueryParam("limit")
+
+	// Default values for pagination
+	pageNum := 1
+	limitNum := 10
+
+	// Parse page and limit if provided
+	if page != "" {
+		parsedPage, err := strconv.Atoi(page)
+		if err == nil && parsedPage > 0 {
+			pageNum = parsedPage
+		}
+	}
+
+	if limit != "" {
+		parsedLimit, err := strconv.Atoi(limit)
+		if err == nil && parsedLimit > 0 {
+			limitNum = parsedLimit
+		}
+	}
+
+	// Calculate the offset based on the current page
+	offset := (pageNum - 1) * limitNum
+
 	// Retrieve the posts by the specific author
 	var posts []models.Post
-	if err := h.DB.Preload("Author").Where("author_id = ?", authorIDUint).Find(&posts).Error; err != nil {
+	if err := h.DB.Limit(limitNum).Offset(offset).Preload("Author").Where("author_id = ?", authorIDUint).Find(&posts).Error; err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{
 			"error": "Failed to retrieve posts",
 		})
 	}
 
-	// Return the posts as JSON
-	return c.JSON(http.StatusOK, posts)
+	// Optionally, return total count for pagination metadata
+	var totalPosts int64
+	if err := h.DB.Model(&models.Post{}).Where("author_id = ?", authorIDUint).Count(&totalPosts).Error; err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"message": "Failed to count posts"})
+	}
 
+	return c.JSON(http.StatusOK, echo.Map{
+		"data":       posts,
+		"page":       pageNum,
+		"limit":      limitNum,
+		"total":      totalPosts,
+		"totalPages": int(totalPosts / int64(limitNum)),
+	})
 }
