@@ -3,7 +3,10 @@ package handlers
 import (
 	"crud_api/models"
 	"net/http"
+	"os"
+	"time"
 
+	"github.com/golang-jwt/jwt"
 	"github.com/labstack/echo/v4"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
@@ -68,4 +71,36 @@ func (h *UserHandler) GetUsers(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, users)
+}
+
+func (h *UserHandler) Login(c echo.Context) error {
+	jwtSecret := os.Getenv("jwtSecret")
+	var creds struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	if err := c.Bind(&creds); err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"message": "Invalid request"})
+	}
+
+	var user models.User
+	if err := h.DB.Where("email = ?", creds.Email).First(&user).Error; err != nil {
+		return c.JSON(http.StatusUnauthorized, echo.Map{"message": "User not found"})
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(creds.Password)); err != nil {
+		return c.JSON(http.StatusUnauthorized, echo.Map{"message": "Invalid credentials"})
+	}
+
+	claims := jwt.MapClaims{
+		"user_id": user.ID,
+		"exp":     time.Now().Add(time.Hour * 24).Unix(),
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signedToken, err := token.SignedString(jwtSecret)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"message": "Could not generate token"})
+	}
+
+	return c.JSON(http.StatusOK, echo.Map{"token": signedToken})
 }
