@@ -7,7 +7,7 @@ import (
 func JSONResponse(c echo.Context, code int, message string, data interface{}) error {
 	return c.JSON(code, echo.Map{
 		"message": message,
-		"data":    data,
+		"results": data,
 	})
 }
 

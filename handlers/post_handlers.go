@@ -120,16 +120,9 @@ func (h *PostHandler) GetPosts(c echo.Context) error {
 		responsePosts = append(responsePosts, ToPostResponse(post))
 	}
 
-	paginatedResponse := echo.Map{
-		"posts":      responsePosts,
-		"page":       pageNum,
-		"limit":      limitNum,
-		"total":      totalPosts,
-		"totalPages": int((totalPosts + int64(limitNum) - 1) / int64(limitNum)), // rounding up
-	}
-
 	// --- Return clean response ---
-	return utils.JSONResponse(c, http.StatusOK, "Posts retrieved successfully", paginatedResponse)
+
+	return utils.PaginatedResponse(c, http.StatusOK, "Posts retrieved successfully", responsePosts, pageNum, limitNum, totalPosts)
 }
 
 // get the post details
@@ -268,15 +261,6 @@ func (h *PostHandler) GetPostsbyAuthor(c echo.Context) error {
 		responsePosts = append(responsePosts, ToPostResponse(post))
 	}
 
-	// Paginated response
-	paginatedResponse := echo.Map{
-		"posts":      responsePosts,
-		"page":       pageNum,
-		"limit":      limitNum,
-		"total":      totalPosts,
-		"totalPages": int((totalPosts + int64(limitNum) - 1) / int64(limitNum)),
-	}
-
 	// Return the paginated response
-	return utils.JSONResponse(c, http.StatusOK, "Posts retrieved successfully", paginatedResponse)
+	return utils.PaginatedResponse(c, http.StatusOK, "Posts retrieved successfully", responsePosts, pageNum, limitNum, totalPosts)
 }
