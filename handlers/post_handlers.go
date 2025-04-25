@@ -17,6 +17,7 @@ func ToPostResponse(p models.Post) responsemodels.PostResponse {
 		ID:          p.ID,
 		Title:       p.Title,
 		Description: p.Description,
+		Created:     p.CreatedAt.String(),
 		Author: responsemodels.AuthorInfo{
 			ID:    p.Author.ID,
 			Name:  p.Author.Name,
@@ -91,41 +92,53 @@ func (h *PostHandler) CreatePost(c echo.Context) error {
 func (h *PostHandler) GetPosts(c echo.Context) error {
 	var posts []models.Post
 
-	// --- Pagination ---
-	page := c.QueryParam("page")
-	limit := c.QueryParam("limit")
+	// --- Query Parameters ---
+	search := c.QueryParam("search")
+	categoryID := c.QueryParam("category_id")
+	authorID := c.QueryParam("author_id")
 
 	pageNum := 1
 	limitNum := 10
 
-	if p, err := strconv.Atoi(page); err == nil && p > 0 {
+	if p, err := strconv.Atoi(c.QueryParam("page")); err == nil && p > 0 {
 		pageNum = p
 	}
-	if l, err := strconv.Atoi(limit); err == nil && l > 0 {
+	if l, err := strconv.Atoi(c.QueryParam("limit")); err == nil && l > 0 {
 		limitNum = l
 	}
-
 	offset := (pageNum - 1) * limitNum
 
-	// --- Fetch posts with Author and Category ---
-	if err := h.DB.Limit(limitNum).Offset(offset).Preload("Author").Preload("Category").Find(&posts).Error; err != nil {
-		return utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to retrieve posts")
+	// --- Build Query ---
+	query := h.DB.Model(&models.Post{}).Preload("Author").Preload("Category")
+
+	if search != "" {
+		query = query.Where("title ILIKE ? OR description ILIKE ?", "%"+search+"%", "%"+search+"%")
+	}
+	if categoryID != "" {
+		query = query.Where("category_id = ?", categoryID)
+	}
+	if authorID != "" {
+		query = query.Where("author_id = ?", authorID)
 	}
 
-	// --- Count total posts for pagination info ---
+	// --- Count total for pagination ---
 	var totalPosts int64
-	if err := h.DB.Model(&models.Post{}).Count(&totalPosts).Error; err != nil {
+	if err := query.Count(&totalPosts).Error; err != nil {
 		return utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to count posts")
 	}
 
-	// --- Convert to DTO (PostResponse) ---
+	// --- Fetch paginated & ordered results ---
+	if err := query.Order("created_at DESC").Limit(limitNum).Offset(offset).Find(&posts).Error; err != nil {
+		return utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to retrieve posts")
+	}
+
+	// --- Map to response format ---
 	var responsePosts []responsemodels.PostResponse
 	for _, post := range posts {
 		responsePosts = append(responsePosts, ToPostResponse(post))
 	}
 
-	// --- Return clean response ---
-
+	// --- Return Paginated Response ---
 	return utils.PaginatedResponse(c, http.StatusOK, "Posts retrieved successfully", responsePosts, pageNum, limitNum, totalPosts)
 }
 

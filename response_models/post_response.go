@@ -6,6 +6,7 @@ type PostResponse struct {
 	Description string       `json:"description"`
 	Author      AuthorInfo   `json:"author"`
 	Category    CategoryInfo `json:"category"`
+	Created     string       `json:"created_at"`
 }
 
 type AuthorInfo struct {

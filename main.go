@@ -23,6 +23,7 @@ func main() {
 	// Middleware for logging and recovery
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
+	e.Use(middleware.CORS())
 
 	// Register routes
 	routes.RegisterRoutes(e, db)

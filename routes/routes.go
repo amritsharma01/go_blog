@@ -21,6 +21,8 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB) {
 	})
 	e.POST("/auth/register", userHandler.CreateUser)
 	e.POST("/auth/login", userHandler.Login)
+	e.GET("/posts/list", postHandler.GetPosts)
+	e.GET("/posts/list/:id", postHandler.PostDetails)
 
 	// Protected routes (require JWT)
 	protected := e.Group("")
@@ -28,8 +30,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB) {
 	{
 		protected.POST("/posts/create", postHandler.CreatePost)
 		protected.GET("/users", userHandler.GetUsers)
-		protected.GET("/posts/list", postHandler.GetPosts)
-		protected.GET("/posts/list/:id", postHandler.PostDetails)
+
 		protected.DELETE("/posts/delete/:id", postHandler.PostDelete)
 		protected.PATCH("/posts/edit/:id", postHandler.PostEdit)
 		protected.GET("/posts/author/:author_id", postHandler.GetPostsbyAuthor)
