@@ -26,5 +26,6 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB) {
 	e.PATCH("/posts/edit/:id", postHandler.PostEdit)
 	e.GET("/posts/author/:author_id", postHandler.GetPostsbyAuthor)
 	e.POST("/category/add", categoryHandler.AddCategory)
+	//e.GET("category/list")
 
 }
