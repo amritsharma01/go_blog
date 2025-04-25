@@ -4,6 +4,7 @@ import (
 	"crud_api/models"
 	responsemodels "crud_api/response_models"
 	"crud_api/utils"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -40,26 +41,29 @@ func NewPostHandler(db *gorm.DB) *PostHandler {
 func (h *PostHandler) CreatePost(c echo.Context) error {
 	var req models.Post
 
-	// Bind DTO
+	// Bind incoming data (excluding AuthorID!)
 	if err := c.Bind(&req); err != nil {
 		return utils.ErrorResponse(c, http.StatusBadRequest, "Invalid Request Body")
 	}
 
-	// Basic validation
-	if req.Title == "" || req.Description == "" || req.AuthorID == 0 {
-		return utils.ErrorResponse(c, http.StatusBadRequest, "Title, Description and AuthorID are required")
+	// Get authenticated user from context
+	authUser, ok := c.Get("user").(models.User)
+	if !ok {
+		return utils.ErrorResponse(c, http.StatusUnauthorized, "User authentication required")
 	}
 
-	// Check post uniqueness
+	// Set AuthorID from the authenticated user
+	req.AuthorID = authUser.ID
+
+	// Basic validation
+	if req.Title == "" || req.Description == "" {
+		return utils.ErrorResponse(c, http.StatusBadRequest, "Title and Description are required")
+	}
+
+	// Check for duplicate post
 	var existing models.Post
 	if err := h.DB.Where("title = ? AND author_id = ?", req.Title, req.AuthorID).First(&existing).Error; err == nil {
 		return utils.ErrorResponse(c, http.StatusConflict, "Post already exists")
-	}
-
-	// Check author existence
-	var author models.User
-	if err := h.DB.First(&author, req.AuthorID).Error; err != nil {
-		return utils.ErrorResponse(c, http.StatusBadRequest, "Author not found")
 	}
 
 	// Optional: validate category
@@ -70,17 +74,17 @@ func (h *PostHandler) CreatePost(c echo.Context) error {
 		}
 	}
 
-	// Save
+	// Save post
 	if err := h.DB.Create(&req).Error; err != nil {
 		return utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to create post")
 	}
 
-	// Preload for response
+	// Preload Author and Category for full response
 	if err := h.DB.Preload("Author").Preload("Category").First(&req, req.ID).Error; err != nil {
 		return utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to load full post data")
 	}
 
-	// Return DTO
+	// Return response
 	return utils.JSONResponse(c, http.StatusCreated, "Successfully created post", ToPostResponse(req))
 }
 
@@ -146,18 +150,43 @@ func (h *PostHandler) PostDetails(c echo.Context) error {
 
 }
 
-// delete the posts
 func (h *PostHandler) PostDelete(c echo.Context) error {
-	// Get the post ID from the URL parameter
-	postID := c.Param("id")
-
-	// Check if the post exists before deleting
-	var post models.Post
-	if err := h.DB.First(&post, postID).Error; err != nil {
-		return utils.ErrorResponse(c, http.StatusNotFound, "Post not found")
+	// Get authenticated user from context
+	authUser, ok := c.Get("user").(models.User)
+	if !ok {
+		return utils.ErrorResponse(c, http.StatusUnauthorized, "User authentication required")
 	}
 
-	// Delete the post with the given ID
+	// Get and validate post ID
+	postID := c.Param("id")
+	if postID == "" {
+		return utils.ErrorResponse(c, http.StatusBadRequest, "Post ID is required")
+	}
+
+	// Convert ID to uint (assuming your ID is numeric)
+	id, err := strconv.ParseUint(postID, 10, 64)
+	if err != nil {
+		return utils.ErrorResponse(c, http.StatusBadRequest, "Invalid post ID format")
+	}
+
+	// Check if post exists
+	var post models.Post
+	if err := h.DB.Preload("Author").First(&post, id).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return utils.ErrorResponse(c, http.StatusNotFound, "Post not found")
+		}
+		return utils.ErrorResponse(c, http.StatusInternalServerError, "Database error")
+	}
+
+	fmt.Println("AuthUser ID:", authUser.Email)
+	fmt.Println("Post AuthorID:", post.Author.Email)
+
+	// Verify authorization
+	if post.Author.Email != authUser.Email {
+		return utils.ErrorResponse(c, http.StatusForbidden, "You can only delete your own posts")
+	}
+
+	// Delete the post
 	if err := h.DB.Delete(&post).Error; err != nil {
 		return utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to delete post")
 	}
@@ -165,20 +194,22 @@ func (h *PostHandler) PostDelete(c echo.Context) error {
 	return utils.JSONResponse(c, http.StatusOK, "Post deleted successfully", nil)
 }
 
-// edit the post
 func (h *PostHandler) PostEdit(c echo.Context) error {
+	// Get the authenticated user from context
+	authUser := c.Get("user").(models.User)
+
 	// Get the post ID from the URL parameter
 	postID := c.Param("id")
 	var req models.Post
 
-	// Bind the request body to the post struct
+	// Bind the request body
 	if err := c.Bind(&req); err != nil {
 		return utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body")
 	}
 
 	// Basic validation
-	if req.Title == "" || req.Description == "" || req.AuthorID == 0 {
-		return utils.ErrorResponse(c, http.StatusBadRequest, "Title, Description and AuthorID are required")
+	if req.Title == "" || req.Description == "" {
+		return utils.ErrorResponse(c, http.StatusBadRequest, "Title and Description are required")
 	}
 
 	// Find the post by ID
@@ -187,10 +218,14 @@ func (h *PostHandler) PostEdit(c echo.Context) error {
 		return utils.ErrorResponse(c, http.StatusNotFound, "Post not found")
 	}
 
-	// Update the post with the new values
+	// Verify the authenticated user is the post author
+	if post.AuthorID != authUser.ID {
+		return utils.ErrorResponse(c, http.StatusForbidden, "You can only edit your own posts")
+	}
+
+	// Update the post (don't allow changing AuthorID)
 	post.Title = req.Title
 	post.Description = req.Description
-	post.AuthorID = req.AuthorID
 	post.CategoryID = req.CategoryID
 
 	// Save the updated post
@@ -198,12 +233,11 @@ func (h *PostHandler) PostEdit(c echo.Context) error {
 		return utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to update post")
 	}
 
-	// Preload the Author and Category for the response
+	// Preload relationships for response
 	if err := h.DB.Preload("Author").Preload("Category").First(&post, post.ID).Error; err != nil {
 		return utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to load full post data")
 	}
 
-	// Return DTO
 	return utils.JSONResponse(c, http.StatusOK, "Successfully updated post", ToPostResponse(post))
 }
 
