@@ -4,7 +4,6 @@ import (
 	"crud_api/config"
 
 	"crud_api/routes"
-	"crud_api/validators"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -13,9 +12,6 @@ import (
 func main() {
 	// Connect to the database
 	db := config.ConnectDB()
-
-	// Initialize validators
-	validators.InitValidators(db)
 
 	// Create an echo instance
 	e := echo.New()

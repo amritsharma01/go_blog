@@ -1,7 +1,9 @@
 package handlers
 
 import (
-	"crud_api/models"
+	models "crud_api/models"
+	responsemodels "crud_api/response_models"
+	"crud_api/utils"
 	"net/http"
 	"os"
 	"time"
@@ -11,6 +13,14 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
+
+func ToUserResponse(u models.User) responsemodels.UserResponse {
+	return responsemodels.UserResponse{
+		ID:    u.ID,
+		Name:  u.Name,
+		Email: u.Email,
+	}
+}
 
 type UserHandler struct {
 	DB *gorm.DB
@@ -28,33 +38,32 @@ func (h *UserHandler) CreateUser(c echo.Context) error {
 	if err := c.Bind(&user); err != nil {
 		// Log the error message
 		c.Logger().Errorf("Error binding request body: %v", err)
-		return c.JSON(http.StatusBadRequest, echo.Map{"message": "Invalid request body"})
+		return utils.ErrorResponse(c, http.StatusBadRequest, "Invalid Request")
 	}
 
 	if user.Name == "" || user.Email == "" || user.Password == "" {
-		return c.JSON(http.StatusBadRequest, echo.Map{"message": "All fields are required"})
+		return utils.ErrorResponse(c, http.StatusBadRequest, "Invalid Request")
 	}
 
 	// Check email uniqueness else error
 	var existing models.User
 	if err := h.DB.Where("email = ?", user.Email).First(&existing).Error; err == nil {
-		return c.JSON(http.StatusConflict, echo.Map{"message": "Email already exists"})
+		return utils.ErrorResponse(c, http.StatusConflict, "Email Already Exists")
 	}
 
 	// Hash password else error
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, echo.Map{"message": "Failed to hash password"})
+		return utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to hash password")
 	}
 	user.Password = string(hashedPassword)
 
 	// Save user else error
 	if err := h.DB.Create(&user).Error; err != nil {
-		return c.JSON(http.StatusInternalServerError, echo.Map{"message": "Failed to create user"})
+		return utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to create user")
 	}
 
-	user.Password = "" // reurning empty string as pass
-	return c.JSON(http.StatusCreated, user)
+	return utils.JSONResponse(c, http.StatusCreated, "User Succesfully Created", ToUserResponse(user))
 }
 
 func (h *UserHandler) GetUsers(c echo.Context) error {
@@ -62,15 +71,20 @@ func (h *UserHandler) GetUsers(c echo.Context) error {
 
 	// Retrieve all users from the database
 	if err := h.DB.Find(&users).Error; err != nil {
-		return c.JSON(http.StatusInternalServerError, echo.Map{"message": "Failed to retrieve users"})
+		return utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to retrieve users")
+
 	}
 
-	// Hide passwords before sending the response
-	for i := range users {
-		users[i].Password = ""
+	var response []responsemodels.UserResponse
+
+	//send only the required contentsfor a single user
+	for _, u := range users {
+		response = append(response, ToUserResponse(u))
+
 	}
 
-	return c.JSON(http.StatusOK, users)
+	return utils.JSONResponse(c, http.StatusOK, "Succesfully Retrieved all users", response)
+
 }
 
 func (h *UserHandler) Login(c echo.Context) error {
