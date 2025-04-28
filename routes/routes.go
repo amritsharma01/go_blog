@@ -3,6 +3,8 @@ package routes
 import (
 	"crud_api/handlers"
 	"crud_api/middleware"
+	"crud_api/repositories"
+	"crud_api/services"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -10,31 +12,51 @@ import (
 )
 
 func RegisterRoutes(e *echo.Echo, db *gorm.DB) {
-	userHandler := handlers.NewUserHandler(db)
-	postHandler := handlers.NewPostHandler(db)
-	categoryHandler := handlers.NewCategory(db)
-	jwtMiddleware := middleware.NewJWTMiddleware(db)
 
-	// Public routes (no authentication needed)
-	e.GET("/", func(c echo.Context) error {
-		return c.String(http.StatusOK, "Welcome to the Blog API!")
-	})
-	e.POST("/auth/register", userHandler.CreateUser)
-	e.POST("/auth/login", userHandler.Login)
-	e.GET("/posts/list", postHandler.GetPosts)
-	e.GET("/posts/list/:id", postHandler.PostDetails)
+	//using jwt middleware
+	jwtMiddleware := middleware.NewJWTMiddleware(db)
 
 	// Protected routes (require JWT)
 	protected := e.Group("")
 	protected.Use(jwtMiddleware.Middleware)
-	{
-		protected.POST("/posts/create", postHandler.CreatePost)
-		protected.GET("/users", userHandler.GetUsers)
 
-		protected.DELETE("/posts/delete/:id", postHandler.PostDelete)
-		protected.PATCH("/posts/edit/:id", postHandler.PostEdit)
-		protected.GET("/posts/author/:author_id", postHandler.GetPostsbyAuthor)
-		protected.POST("/category/add", categoryHandler.AddCategory)
-		protected.GET("/category/list", categoryHandler.ListCategories)
-	}
+	//common public route
+	e.GET("/", func(c echo.Context) error {
+		return c.String(http.StatusOK, "Welcome to the Blog API!")
+	})
+
+	//dependency injection for user
+	userRepo := repositories.NewUserRepository(db)
+	userService := services.NewUserService(userRepo)
+	userHandler := handlers.NewUserHandler(userService)
+
+	//public routes for users
+	e.POST("/auth/register", userHandler.Register)
+	e.POST("/auth/login", userHandler.Login)
+
+	//private routes for users
+	protected.GET("/users", userHandler.GetAllUsers)
+
+	//dependency injection for posts
+	postRepo := repositories.NewPostRepository(db)
+	postService := services.NewPostService(postRepo)
+	postHandler := handlers.NewPostHandler(postService)
+
+	//public routes for posts
+	e.GET("/posts/list", postHandler.GetPosts)
+	e.GET("/posts/list/:id", postHandler.PostDetails)
+
+	//protected routes for posts
+	protected.POST("/posts/create", postHandler.CreatePost)
+	protected.DELETE("/posts/delete/:id", postHandler.PostDelete)
+	protected.PATCH("/posts/edit/:id", postHandler.PostEdit)
+	protected.GET("/posts/author/:author_id", postHandler.GetPostsbyAuthor)
+
+	// dependency injection for category
+	categoryHandler := handlers.NewCategory(db)
+
+	//private routes for category
+	protected.POST("/category/add", categoryHandler.AddCategory)
+	protected.GET("/category/list", categoryHandler.ListCategories)
+
 }

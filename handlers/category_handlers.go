@@ -11,7 +11,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func ToCatResponse(c models.Category) responsemodels.CategoryResponse {
+func toCatResponse(c models.Category) responsemodels.CategoryResponse {
 	return responsemodels.CategoryResponse{
 		ID:   c.ID,
 		Name: c.Name,
@@ -53,7 +53,7 @@ func (h *CategoryHandler) AddCategory(c echo.Context) error {
 	if err := h.DB.Create(&category).Error; err != nil {
 		return utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to add category")
 	}
-	return utils.JSONResponse(c, http.StatusCreated, "Category Created Succesfully", ToCatResponse(category))
+	return utils.JSONResponse(c, http.StatusCreated, "Category Created Succesfully", toCatResponse(category))
 
 }
 
@@ -83,7 +83,7 @@ func (h *CategoryHandler) ListCategories(c echo.Context) error {
 
 	var responseCategories []responsemodels.CategoryResponse
 	for _, cat := range categories {
-		responseCategories = append(responseCategories, ToCatResponse(cat))
+		responseCategories = append(responseCategories, toCatResponse(cat))
 	}
 
 	return utils.PaginatedResponse(c, http.StatusOK, "Categories retrieved successfully", responseCategories, pageNum, limitNum, total)

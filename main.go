@@ -17,7 +17,6 @@ func main() {
 	}
 	// Connect to the database
 	db := config.ConnectDB()
-
 	// Create an echo instance
 	e := echo.New()
 	// Middleware for logging and recovery
