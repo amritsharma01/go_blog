@@ -2,64 +2,57 @@ package handlers
 
 import (
 	"crud_api/models"
+	requestmodels "crud_api/request_models"
 	responsemodels "crud_api/response_models"
+	"crud_api/services"
 	"crud_api/utils"
 	"net/http"
 	"strconv"
 
 	"github.com/labstack/echo/v4"
-	"gorm.io/gorm"
 )
 
-func toCatResponse(c models.Category) responsemodels.CategoryResponse {
-	return responsemodels.CategoryResponse{
-		ID:   c.ID,
-		Name: c.Name,
-	}
-}
-
 type CategoryHandler struct {
-	DB *gorm.DB
+	service services.CategoryService
 }
 
 // Constructor
-func NewCategory(db *gorm.DB) *CategoryHandler {
-	return &CategoryHandler{DB: db}
+func NewCategoryHandler(service services.CategoryService) *CategoryHandler {
+	return &CategoryHandler{service: service}
 }
 
 func (h *CategoryHandler) AddCategory(c echo.Context) error {
-	var category models.Category
+	var req requestmodels.CategoryRequest
 
-	// Bind the request body to the Post struct
-	if err := c.Bind(&category); err != nil {
-		// Log the error message
-		c.Logger().Errorf("Error binding request body: %v", err)
+	if err := c.Bind(&req); err != nil {
 		return utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body")
-
 	}
 
-	// Check if all required fields are filled
-	if category.Name == "" {
-		return utils.ErrorResponse(c, http.StatusBadRequest, "Category Name is required")
-
+	// Validate manually if needed (or use echo middleware later)
+	if req.Name == "" {
+		return utils.ErrorResponse(c, http.StatusBadRequest, "Category name is required")
 	}
 
-	var existing models.Category
-	if err := h.DB.Where("cname = ?", category.Name).First(&existing).Error; err == nil {
+	exists, err := h.service.CategoryExists(req.Name)
+	if err != nil {
+		return utils.ErrorResponse(c, http.StatusInternalServerError, "Error checking category existence")
+	}
+	if exists {
 		return utils.ErrorResponse(c, http.StatusConflict, "Category already exists")
 	}
 
-	// Save post
-	if err := h.DB.Create(&category).Error; err != nil {
-		return utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to add category")
+	category := models.Category{
+		Name: req.Name,
 	}
-	return utils.JSONResponse(c, http.StatusCreated, "Category Created Succesfully", toCatResponse(category))
 
+	if err := h.service.AddCategory(&category); err != nil {
+		return utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to create category")
+	}
+
+	return utils.JSONResponse(c, http.StatusCreated, "Category created successfully", responsemodels.ToCatResponse(category))
 }
 
 func (h *CategoryHandler) ListCategories(c echo.Context) error {
-	var categories []models.Category
-
 	pageNum := 1
 	limitNum := 10
 
@@ -69,22 +62,32 @@ func (h *CategoryHandler) ListCategories(c echo.Context) error {
 	if l, err := strconv.Atoi(c.QueryParam("limit")); err == nil && l > 0 {
 		limitNum = l
 	}
-
 	offset := (pageNum - 1) * limitNum
 
-	if err := h.DB.Limit(limitNum).Offset(offset).Find(&categories).Error; err != nil {
+	categories, total, err := h.service.GetCategories(limitNum, offset)
+	if err != nil {
 		return utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to retrieve categories")
-	}
-
-	var total int64
-	if err := h.DB.Model(&models.Category{}).Count(&total).Error; err != nil {
-		return utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to count categories")
 	}
 
 	var responseCategories []responsemodels.CategoryResponse
 	for _, cat := range categories {
-		responseCategories = append(responseCategories, toCatResponse(cat))
+		responseCategories = append(responseCategories, responsemodels.ToCatResponse(cat))
 	}
 
 	return utils.PaginatedResponse(c, http.StatusOK, "Categories retrieved successfully", responseCategories, pageNum, limitNum, total)
+}
+
+func (h *CategoryHandler) DeleteCategory(c echo.Context) error {
+	category_id, _ := strconv.Atoi(c.Param("id"))
+
+	cat, err := h.service.GetByID(uint(category_id))
+	if err != nil {
+		return utils.ErrorResponse(c, http.StatusNotFound, "Category Not Found")
+	}
+
+	if err := h.service.DeleteCategory(cat); err != nil {
+		return utils.ErrorResponse(c, http.StatusForbidden, "Unable to delete category")
+	}
+
+	return utils.JSONResponse(c, http.StatusOK, "Category Deleted Sccesfully", nil)
 }

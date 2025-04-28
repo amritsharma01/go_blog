@@ -53,10 +53,15 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB) {
 	protected.GET("/posts/author/:author_id", postHandler.GetPostsbyAuthor)
 
 	// dependency injection for category
-	categoryHandler := handlers.NewCategory(db)
+	categoryRepo := repositories.NewCategoryRepository(db)
+	categoryService := services.NewCategoryService(categoryRepo)
+	categoryHandler := handlers.NewCategoryHandler(categoryService)
+
+	//public routes for category
+	protected.GET("/category/list", categoryHandler.ListCategories)
 
 	//private routes for category
 	protected.POST("/category/add", categoryHandler.AddCategory)
-	protected.GET("/category/list", categoryHandler.ListCategories)
+	protected.DELETE("/category/delete/:id", categoryHandler.DeleteCategory)
 
 }
