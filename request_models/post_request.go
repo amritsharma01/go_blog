@@ -6,13 +6,13 @@ import "crud_api/models"
 type CreatePostRequest struct {
 	Title       string `json:"title" validate:"required"`
 	Description string `json:"description" validate:"required"`
-	CategoryID  *uint  `json:"category_id,omitempty"` // optional
+	CategoryID  uint   `json:"category_id,omitempty"` // optional
 }
 
 type UpdatePostRequest struct {
 	Title       string `json:"title" validate:"required"`
 	Description string `json:"description" validate:"required"`
-	CategoryID  *uint  `json:"category_id,omitempty"` // optional
+	CategoryID  uint   `json:"category_id,omitempty"` // optional
 }
 
 func FromCreatePostRequest(req CreatePostRequest, authorID uint) models.Post {
@@ -28,4 +28,5 @@ func FromUpdatePostRequest(post *models.Post, req UpdatePostRequest) {
 	post.Title = req.Title
 	post.Description = req.Description
 	post.CategoryID = req.CategoryID
+	post.Category = models.Category{}
 }

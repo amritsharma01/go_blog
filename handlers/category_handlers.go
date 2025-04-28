@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"crud_api/models"
 	requestmodels "crud_api/request_models"
 	responsemodels "crud_api/response_models"
 	"crud_api/services"
@@ -28,7 +27,6 @@ func (h *CategoryHandler) AddCategory(c echo.Context) error {
 		return utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body")
 	}
 
-	// Validate manually if needed (or use echo middleware later)
 	if req.Name == "" {
 		return utils.ErrorResponse(c, http.StatusBadRequest, "Category name is required")
 	}
@@ -41,9 +39,7 @@ func (h *CategoryHandler) AddCategory(c echo.Context) error {
 		return utils.ErrorResponse(c, http.StatusConflict, "Category already exists")
 	}
 
-	category := models.Category{
-		Name: req.Name,
-	}
+	category := requestmodels.FromCatRequest(req)
 
 	if err := h.service.AddCategory(&category); err != nil {
 		return utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to create category")

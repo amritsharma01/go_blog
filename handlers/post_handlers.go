@@ -119,7 +119,10 @@ func (h *PostHandler) PostEdit(c echo.Context) error {
 		return utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to update post")
 	}
 
-	updatedPost, _ := h.service.GetByID(post.ID)
+	updatedPost, err := h.service.GetByID(post.ID)
+	if err != nil {
+		return utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to fetch updated post")
+	}
 
 	return utils.JSONResponse(c, http.StatusOK, "Post updated successfully", responsemodels.ToPostResponse(*updatedPost))
 }

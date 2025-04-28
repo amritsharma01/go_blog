@@ -13,7 +13,7 @@ import (
 
 func RegisterRoutes(e *echo.Echo, db *gorm.DB) {
 
-	//using jwt middleware
+	//using jwt middleware``
 	jwtMiddleware := middleware.NewJWTMiddleware(db)
 
 	// Protected routes (require JWT)

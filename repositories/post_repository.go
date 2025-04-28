@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"crud_api/models"
+	"log"
 
 	"gorm.io/gorm"
 )
@@ -81,6 +82,7 @@ func (r *postRepository) FindByAuthorID(authorID uint, offset, limit int) ([]mod
 }
 
 func (r *postRepository) Update(post *models.Post) error {
+	log.Printf("Updating Post: Title=%s, Description=%s, CategoryID=%d", post.Title, post.Description, post.CategoryID)
 	return r.db.Save(post).Error
 }
 
