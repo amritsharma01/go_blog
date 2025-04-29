@@ -45,18 +45,9 @@ func (h *PostHandler) GetPosts(c echo.Context) error {
 	search := c.QueryParam("search")
 	categoryID := c.QueryParam("category_id")
 	authorID := c.QueryParam("author_id")
+	p := utils.GetPagination(c)
 
-	page, _ := strconv.Atoi(c.QueryParam("page"))
-	limit, _ := strconv.Atoi(c.QueryParam("limit"))
-	if page == 0 {
-		page = 1
-	}
-	if limit == 0 {
-		limit = 10
-	}
-	offset := (page - 1) * limit
-
-	posts, total, err := h.service.GetAll(search, categoryID, authorID, offset, limit)
+	posts, total, err := h.service.GetAll(search, categoryID, authorID, p.Offset, p.Limit)
 	if err != nil {
 		return utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to retrieve posts")
 	}
@@ -66,7 +57,7 @@ func (h *PostHandler) GetPosts(c echo.Context) error {
 		response = append(response, responsemodels.ToPostResponse(p))
 	}
 
-	return utils.PaginatedResponse(c, http.StatusOK, "Posts retrieved successfully", response, page, limit, total)
+	return utils.PaginatedResponse(c, http.StatusOK, "Posts retrieved successfully", response, p.Page, p.Limit, total)
 }
 
 func (h *PostHandler) PostDetails(c echo.Context) error {
@@ -130,17 +121,9 @@ func (h *PostHandler) PostEdit(c echo.Context) error {
 func (h *PostHandler) GetPostsbyAuthor(c echo.Context) error {
 	authorID, _ := strconv.Atoi(c.Param("author_id"))
 
-	page, _ := strconv.Atoi(c.QueryParam("page"))
-	limit, _ := strconv.Atoi(c.QueryParam("limit"))
-	if page == 0 {
-		page = 1
-	}
-	if limit == 0 {
-		limit = 10
-	}
-	offset := (page - 1) * limit
+	p := utils.GetPagination(c)
 
-	posts, total, err := h.service.GetByAuthorID(uint(authorID), offset, limit)
+	posts, total, err := h.service.GetByAuthorID(uint(authorID), p.Offset, p.Limit)
 	if err != nil {
 		return utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to retrieve posts")
 	}
@@ -150,5 +133,5 @@ func (h *PostHandler) GetPostsbyAuthor(c echo.Context) error {
 		response = append(response, responsemodels.ToPostResponse(p))
 	}
 
-	return utils.PaginatedResponse(c, http.StatusOK, "Posts retrieved successfully", response, page, limit, total)
+	return utils.PaginatedResponse(c, http.StatusOK, "Posts retrieved successfully", response, p.Page, p.Limit, total)
 }

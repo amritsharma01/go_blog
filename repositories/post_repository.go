@@ -94,6 +94,7 @@ func (r *postRepository) FindDuplicate(title string, authorID uint) (*models.Pos
 	var post models.Post
 	if err := r.db.Where("title = ? AND author_id = ?", title, authorID).First(&post).Error; err != nil {
 		return nil, err
+
 	}
 	return &post, nil
 }

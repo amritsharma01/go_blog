@@ -58,3 +58,12 @@ var (
 	ErrPostAlreadyExists  = errors.New("post already exists")
 	ErrUnauthorizedAction = errors.New("you are not authorized to perform this action")
 )
+
+// struct AppError{
+// 	message string
+// 	status int
+// }
+
+// func ServerError(message string) error {
+// 	retu
+// }
