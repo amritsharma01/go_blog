@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"crud_api/errors"
 	"crud_api/models"
 	"log"
 
@@ -26,13 +27,19 @@ func NewPostRepository(db *gorm.DB) PostRepository {
 }
 
 func (r *postRepository) Create(post *models.Post) error {
-	return r.db.Create(post).Error
+	if err := r.db.Create(post).Error; err != nil {
+		return errors.New(500, "Failed to create post", err)
+	}
+	return nil
 }
 
 func (r *postRepository) FindByID(id uint) (*models.Post, error) {
 	var post models.Post
 	if err := r.db.Preload("Author").Preload("Category").First(&post, id).Error; err != nil {
-		return nil, err
+		if err == gorm.ErrRecordNotFound {
+			return nil, errors.NewWithMessage(404, "Post not found")
+		}
+		return nil, errors.New(500, "Failed to fetch post by ID", err)
 	}
 	return &post, nil
 }
@@ -54,11 +61,11 @@ func (r *postRepository) FindAll(search, categoryID, authorID string, offset, li
 	}
 
 	if err := query.Count(&count).Error; err != nil {
-		return nil, 0, err
+		return nil, 0, errors.New(500, "Failed to count posts", err)
 	}
 
 	if err := query.Order("created_at DESC").Limit(limit).Offset(offset).Find(&posts).Error; err != nil {
-		return nil, 0, err
+		return nil, 0, errors.New(500, "Failed to fetch posts", err)
 	}
 
 	return posts, count, nil
@@ -71,11 +78,11 @@ func (r *postRepository) FindByAuthorID(authorID uint, offset, limit int) ([]mod
 	query := r.db.Model(&models.Post{}).Where("author_id = ?", authorID).Preload("Author").Preload("Category")
 
 	if err := query.Count(&count).Error; err != nil {
-		return nil, 0, err
+		return nil, 0, errors.New(500, "Failed to count posts by author", err)
 	}
 
 	if err := query.Limit(limit).Offset(offset).Find(&posts).Error; err != nil {
-		return nil, 0, err
+		return nil, 0, errors.New(500, "Failed to fetch posts by author", err)
 	}
 
 	return posts, count, nil
@@ -83,18 +90,26 @@ func (r *postRepository) FindByAuthorID(authorID uint, offset, limit int) ([]mod
 
 func (r *postRepository) Update(post *models.Post) error {
 	log.Printf("Updating Post: Title=%s, Description=%s, CategoryID=%d", post.Title, post.Description, post.CategoryID)
-	return r.db.Save(post).Error
+	if err := r.db.Save(post).Error; err != nil {
+		return errors.New(500, "Failed to update post", err)
+	}
+	return nil
 }
 
 func (r *postRepository) Delete(post *models.Post) error {
-	return r.db.Delete(post).Error
+	if err := r.db.Delete(post).Error; err != nil {
+		return errors.New(500, "Failed to delete post", err)
+	}
+	return nil
 }
 
 func (r *postRepository) FindDuplicate(title string, authorID uint) (*models.Post, error) {
 	var post models.Post
 	if err := r.db.Where("title = ? AND author_id = ?", title, authorID).First(&post).Error; err != nil {
-		return nil, err
-
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil // No duplicate is not an error
+		}
+		return nil, errors.New(500, "Failed to check for duplicate post", err)
 	}
 	return &post, nil
 }

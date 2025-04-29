@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"crud_api/errors"
 	"crud_api/models"
 	requestmodels "crud_api/request_models"
 	responsemodels "crud_api/response_models"
@@ -45,13 +46,20 @@ func (h *PostHandler) CreatePost(c echo.Context) error {
 	post := requestmodels.FromCreatePostRequest(req, authUser.ID)
 
 	if err := h.service.Create(&post); err != nil {
-		if err == services.ErrPostAlreadyExists {
-			return utils.ErrorResponse(c, http.StatusConflict, "Post already exists")
+		if appErr, ok := err.(*errors.AppError); ok {
+			return utils.ErrorResponse(c, appErr.Code, appErr.Message)
 		}
-		return utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to create post")
+		// fallback in case error wasn't wrapped properly
+		return utils.ErrorResponse(c, http.StatusInternalServerError, "Unexpected error")
 	}
 
-	createdPost, _ := h.service.GetByID(post.ID)
+	createdPost, err := h.service.GetByID(post.ID)
+	if err != nil {
+		if appErr, ok := err.(*errors.AppError); ok {
+			return utils.ErrorResponse(c, appErr.Code, appErr.Message)
+		}
+		return utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to fetch created post")
+	}
 
 	return utils.JSONResponse(c, http.StatusCreated, "Successfully created post", responsemodels.ToPostResponse(*createdPost))
 }
@@ -78,7 +86,10 @@ func (h *PostHandler) GetPosts(c echo.Context) error {
 
 	posts, total, err := h.service.GetAll(search, categoryID, authorID, p.Offset, p.Limit)
 	if err != nil {
-		return utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to retrieve posts")
+		if appErr, ok := err.(*errors.AppError); ok {
+			return utils.ErrorResponse(c, appErr.Code, appErr.Message)
+		}
+		return utils.ErrorResponse(c, http.StatusInternalServerError, "Unexpected error")
 	}
 
 	var response []responsemodels.PostResponse
@@ -103,9 +114,13 @@ func (h *PostHandler) GetPosts(c echo.Context) error {
 // @Router /posts/{id} [get]
 func (h *PostHandler) PostDetails(c echo.Context) error {
 	id, _ := strconv.Atoi(c.Param("id"))
+
 	post, err := h.service.GetByID(uint(id))
 	if err != nil {
-		return utils.ErrorResponse(c, http.StatusNotFound, "Post not found")
+		if appErr, ok := err.(*errors.AppError); ok {
+			return utils.ErrorResponse(c, appErr.Code, appErr.Message)
+		}
+		return utils.ErrorResponse(c, http.StatusInternalServerError, "Unexpected error")
 	}
 
 	return utils.JSONResponse(c, http.StatusOK, "Post retrieved successfully", responsemodels.ToPostResponse(*post))
@@ -131,11 +146,17 @@ func (h *PostHandler) PostDelete(c echo.Context) error {
 
 	post, err := h.service.GetByID(uint(id))
 	if err != nil {
-		return utils.ErrorResponse(c, http.StatusNotFound, "Post not found")
+		if appErr, ok := err.(*errors.AppError); ok {
+			return utils.ErrorResponse(c, appErr.Code, appErr.Message)
+		}
+		return utils.ErrorResponse(c, http.StatusInternalServerError, "Unexpected error")
 	}
 
 	if err := h.service.Delete(post, authUser.ID); err != nil {
-		return utils.ErrorResponse(c, http.StatusForbidden, "You can only delete your own posts")
+		if appErr, ok := err.(*errors.AppError); ok {
+			return utils.ErrorResponse(c, appErr.Code, appErr.Message)
+		}
+		return utils.ErrorResponse(c, http.StatusInternalServerError, "Unexpected error")
 	}
 
 	return utils.JSONResponse(c, http.StatusOK, "Post deleted successfully", nil)
@@ -168,7 +189,10 @@ func (h *PostHandler) PostEdit(c echo.Context) error {
 
 	post, err := h.service.GetByID(uint(id))
 	if err != nil {
-		return utils.ErrorResponse(c, http.StatusNotFound, "Post not found")
+		if appErr, ok := err.(*errors.AppError); ok {
+			return utils.ErrorResponse(c, appErr.Code, appErr.Message)
+		}
+		return utils.ErrorResponse(c, http.StatusInternalServerError, "Unexpected error")
 	}
 
 	if post.AuthorID != authUser.ID {
@@ -178,11 +202,17 @@ func (h *PostHandler) PostEdit(c echo.Context) error {
 	requestmodels.FromUpdatePostRequest(post, req)
 
 	if err := h.service.Update(post); err != nil {
+		if appErr, ok := err.(*errors.AppError); ok {
+			return utils.ErrorResponse(c, appErr.Code, appErr.Message)
+		}
 		return utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to update post")
 	}
 
 	updatedPost, err := h.service.GetByID(post.ID)
 	if err != nil {
+		if appErr, ok := err.(*errors.AppError); ok {
+			return utils.ErrorResponse(c, appErr.Code, appErr.Message)
+		}
 		return utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to fetch updated post")
 	}
 
@@ -205,12 +235,14 @@ func (h *PostHandler) PostEdit(c echo.Context) error {
 // @Router /authors/{author_id}/posts [get]
 func (h *PostHandler) GetPostsbyAuthor(c echo.Context) error {
 	authorID, _ := strconv.Atoi(c.Param("author_id"))
-
 	p := utils.GetPagination(c)
 
 	posts, total, err := h.service.GetByAuthorID(uint(authorID), p.Offset, p.Limit)
 	if err != nil {
-		return utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to retrieve posts")
+		if appErr, ok := err.(*errors.AppError); ok {
+			return utils.ErrorResponse(c, appErr.Code, appErr.Message)
+		}
+		return utils.ErrorResponse(c, http.StatusInternalServerError, "Unexpected error")
 	}
 
 	var response []responsemodels.PostResponse

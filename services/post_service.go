@@ -1,9 +1,9 @@
 package services
 
 import (
+	"crud_api/errors"
 	"crud_api/models"
 	"crud_api/repositories"
-	"errors"
 )
 
 type PostService interface {
@@ -24,46 +24,48 @@ func NewPostService(repo repositories.PostRepository) PostService {
 }
 
 func (s *postService) Create(post *models.Post) error {
-	if existing, err := s.repo.FindDuplicate(post.Title, post.AuthorID); err == nil && existing != nil {
-		return ErrPostAlreadyExists
+	existing, err := s.repo.FindDuplicate(post.Title, post.AuthorID)
+	if err != nil {
+		return err // propagate repository error with full context
 	}
+	if existing != nil {
+		return errors.NewWithMessage(409, "Post already exists")
+	}
+
 	return s.repo.Create(post)
 }
 
 func (s *postService) GetByID(id uint) (*models.Post, error) {
-	return s.repo.FindByID(id)
+	post, err := s.repo.FindByID(id)
+	if err != nil {
+		return nil, errors.NewWithMessage(404, "Post not found")
+	}
+	return post, nil
 }
 
 func (s *postService) GetAll(search, categoryID, authorID string, offset, limit int) ([]models.Post, int64, error) {
-	return s.repo.FindAll(search, categoryID, authorID, offset, limit)
+	posts, count, err := s.repo.FindAll(search, categoryID, authorID, offset, limit)
+	if err != nil {
+		return nil, 0, err // keep raw repo error
+	}
+	return posts, count, nil
 }
 
 func (s *postService) GetByAuthorID(authorID uint, offset, limit int) ([]models.Post, int64, error) {
-	return s.repo.FindByAuthorID(authorID, offset, limit)
+	posts, count, err := s.repo.FindByAuthorID(authorID, offset, limit)
+	if err != nil {
+		return nil, 0, err
+	}
+	return posts, count, nil
 }
 
 func (s *postService) Update(post *models.Post) error {
-	return s.repo.Update(post)
+	return s.repo.Update(post) // propagate raw
 }
 
 func (s *postService) Delete(post *models.Post, userID uint) error {
 	if post.AuthorID != userID {
-		return ErrUnauthorizedAction
+		return errors.NewWithMessage(403, "You are not authorized to delete this post")
 	}
 	return s.repo.Delete(post)
 }
-
-// Custom errors
-var (
-	ErrPostAlreadyExists  = errors.New("post already exists")
-	ErrUnauthorizedAction = errors.New("you are not authorized to perform this action")
-)
-
-// struct AppError{
-// 	message string
-// 	status int
-// }
-
-// func ServerError(message string) error {
-// 	retu
-// }
