@@ -1,3 +1,20 @@
+// @title CRUD API
+// @version 1.0
+// @description This is a sample CRUD API with JWT authentication.
+// @termsOfService http://swagger.io/terms/
+
+// @contact.name API Support
+// @contact.url http://www.swagger.io/support
+// @contact.email support@swagger.io
+
+// @license.name Apache 2.0
+// @license.url http://www.apache.org/licenses/LICENSE-2.0.html
+
+// @host localhost:8080
+// @BasePath /
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
 package main
 
 import (
@@ -6,9 +23,12 @@ import (
 
 	"crud_api/routes"
 
+	_ "crud_api/docs"
+
 	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	echoSwagger "github.com/swaggo/echo-swagger"
 )
 
 func main() {
@@ -27,6 +47,7 @@ func main() {
 	// Register routes
 	routes.RegisterRoutes(e, db)
 
+	e.GET("/swagger/*", echoSwagger.WrapHandler)
 	// Start the server
 	e.Logger.Fatal(e.Start(":8080"))
 }

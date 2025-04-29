@@ -21,6 +21,18 @@ func NewUserHandler(service services.UserService) *UserHandler {
 	return &UserHandler{service}
 }
 
+// Register godoc
+// @Summary Register a new user
+// @Description Create a new user account
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param user body requestmodels.CreateUserRequest true "User registration data"
+// @Success 201 {object} utils.JSONResponseStruct{data=responsemodels.UserResponse}
+// @Failure 400 {object} utils.ErrorResponseStruct
+// @Failure 409 {object} utils.ErrorResponseStruct
+// @Failure 500 {object} utils.ErrorResponseStruct
+// @Router /auth/register [post]
 func (h *UserHandler) Register(c echo.Context) error {
 	var req requestmodels.CreateUserRequest
 
@@ -40,6 +52,18 @@ func (h *UserHandler) Register(c echo.Context) error {
 	return utils.JSONResponse(c, http.StatusCreated, "User created successfully", responsemodels.ToUserResponse(user))
 }
 
+// Login godoc
+// @Summary Authenticate user
+// @Description Login with email and password to get JWT token
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param credentials body requestmodels.LoginRequest true "Login credentials"
+// @Success 200 {object} utils.JSONResponseStruct{data=responsemodels.LoginResponse}
+// @Failure 400 {object} utils.ErrorResponseStruct
+// @Failure 401 {object} utils.ErrorResponseStruct
+// @Failure 500 {object} utils.ErrorResponseStruct
+// @Router /auth/login [post]
 func (h *UserHandler) Login(c echo.Context) error {
 	var req requestmodels.LoginRequest
 
@@ -66,12 +90,21 @@ func (h *UserHandler) Login(c echo.Context) error {
 		return utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to generate token")
 	}
 
-	return utils.JSONResponse(c, http.StatusOK, "Login successful", echo.Map{
-		"user":  responsemodels.ToUserResponse(*dbUser),
-		"token": signedToken,
-	})
+	loginResp := responsemodels.NewLoginResponse(responsemodels.ToUserResponse(*dbUser), signedToken)
+	return utils.JSONResponse(c, http.StatusOK, "Login successful", loginResp)
 }
 
+// GetAllUsers godoc
+// @Summary Get all users
+// @Description Retrieve list of all users (requires admin JWT)
+// @Tags users
+// @Security BearerAuth
+// @Produce json
+// @Success 200 {object} utils.PaginatedResponse{data=[]responsemodels.UserResponse}
+// @Failure 401 {object} utils.ErrorResponseStruct
+// @Failure 403 {object} utils.ErrorResponseStruct
+// @Failure 500 {object} utils.ErrorResponseStruct
+// @Router /users [get]
 func (h *UserHandler) GetAllUsers(c echo.Context) error {
 	users, err := h.service.GetAllUsers()
 	if err != nil {

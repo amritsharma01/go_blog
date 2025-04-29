@@ -20,6 +20,21 @@ func NewPostHandler(service services.PostService) *PostHandler {
 	return &PostHandler{service}
 }
 
+// CreatePost godoc
+// @Summary Create a new post
+// @Description Create a new blog post (requires authentication)
+// @Tags posts
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param post body requestmodels.CreatePostRequest true "Post content"
+// @Success 201 {object} utils.JSONResponseStruct{data=responsemodels.PostResponse}
+// @Failure 400 {object} utils.ErrorResponseStruct
+// @Failure 401 {object} utils.ErrorResponseStruct
+// @Failure 403 {object} utils.ErrorResponseStruct
+// @Failure 409 {object} utils.ErrorResponseStruct
+// @Failure 500 {object} utils.ErrorResponseStruct
+// @Router /posts [post]
 func (h *PostHandler) CreatePost(c echo.Context) error {
 	var req requestmodels.CreatePostRequest
 	if err := c.Bind(&req); err != nil {
@@ -41,6 +56,20 @@ func (h *PostHandler) CreatePost(c echo.Context) error {
 	return utils.JSONResponse(c, http.StatusCreated, "Successfully created post", responsemodels.ToPostResponse(*createdPost))
 }
 
+// GetPosts godoc
+// @Summary Get list of posts
+// @Description Get paginated list of posts with optional filters
+// @Tags posts
+// @Accept json
+// @Produce json
+// @Param search query string false "Search term"
+// @Param category_id query string false "Filter by category ID"
+// @Param author_id query string false "Filter by author ID"
+// @Param page query int false "Page number" default(1)
+// @Param limit query int false "Items per page" default(10)
+// @Success 200 {object} utils.PaginatedResponse{data=[]responsemodels.PostResponse}
+// @Failure 500 {object} utils.ErrorResponseStruct
+// @Router /posts [get]
 func (h *PostHandler) GetPosts(c echo.Context) error {
 	search := c.QueryParam("search")
 	categoryID := c.QueryParam("category_id")
@@ -53,13 +82,25 @@ func (h *PostHandler) GetPosts(c echo.Context) error {
 	}
 
 	var response []responsemodels.PostResponse
-	for _, p := range posts {
-		response = append(response, responsemodels.ToPostResponse(p))
+	for _, post := range posts {
+		response = append(response, responsemodels.ToPostResponse(post))
 	}
 
-	return utils.PaginatedResponse(c, http.StatusOK, "Posts retrieved successfully", response, p.Page, p.Limit, total)
+	paginated := utils.NewPaginatedResponse(response, p.Page, p.Limit, total)
+	return utils.SendPaginatedResponse(c, http.StatusOK, "Posts retrieved successfully", paginated)
 }
 
+// PostDetails godoc
+// @Summary Get post details
+// @Description Get details of a specific post
+// @Tags posts
+// @Accept json
+// @Produce json
+// @Param id path int true "Post ID"
+// @Success 200 {object} utils.JSONResponseStruct{data=responsemodels.PostResponse}
+// @Failure 404 {object} utils.ErrorResponseStruct
+// @Failure 500 {object} utils.ErrorResponseStruct
+// @Router /posts/{id} [get]
 func (h *PostHandler) PostDetails(c echo.Context) error {
 	id, _ := strconv.Atoi(c.Param("id"))
 	post, err := h.service.GetByID(uint(id))
@@ -70,6 +111,20 @@ func (h *PostHandler) PostDetails(c echo.Context) error {
 	return utils.JSONResponse(c, http.StatusOK, "Post retrieved successfully", responsemodels.ToPostResponse(*post))
 }
 
+// PostDelete godoc
+// @Summary Delete a post
+// @Description Delete a post (only by author or admin)
+// @Tags posts
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Post ID"
+// @Success 200 {object} utils.JSONResponseStruct
+// @Failure 401 {object} utils.ErrorResponseStruct
+// @Failure 403 {object} utils.ErrorResponseStruct
+// @Failure 404 {object} utils.ErrorResponseStruct
+// @Failure 500 {object} utils.ErrorResponseStruct
+// @Router /posts/{id} [delete]
 func (h *PostHandler) PostDelete(c echo.Context) error {
 	authUser := c.Get("user").(models.User)
 	id, _ := strconv.Atoi(c.Param("id"))
@@ -86,6 +141,22 @@ func (h *PostHandler) PostDelete(c echo.Context) error {
 	return utils.JSONResponse(c, http.StatusOK, "Post deleted successfully", nil)
 }
 
+// PostEdit godoc
+// @Summary Update a post
+// @Description Update an existing post (only by author)
+// @Tags posts
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Post ID"
+// @Param post body requestmodels.UpdatePostRequest true "Updated post content"
+// @Success 200 {object} utils.JSONResponseStruct{data=responsemodels.PostResponse}
+// @Failure 400 {object} utils.ErrorResponseStruct
+// @Failure 401 {object} utils.ErrorResponseStruct
+// @Failure 403 {object} utils.ErrorResponseStruct
+// @Failure 404 {object} utils.ErrorResponseStruct
+// @Failure 500 {object} utils.ErrorResponseStruct
+// @Router /posts/{id} [patch]
 func (h *PostHandler) PostEdit(c echo.Context) error {
 	authUser := c.Get("user").(models.User)
 	id, _ := strconv.Atoi(c.Param("id"))
@@ -118,6 +189,20 @@ func (h *PostHandler) PostEdit(c echo.Context) error {
 	return utils.JSONResponse(c, http.StatusOK, "Post updated successfully", responsemodels.ToPostResponse(*updatedPost))
 }
 
+// GetPostsbyAuthor godoc
+// @Summary Get posts by author
+// @Description Get paginated list of posts by specific author
+// @Tags posts
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param author_id path int true "Author ID"
+// @Param page query int false "Page number" default(1)
+// @Param limit query int false "Items per page" default(10)
+// @Success 200 {object} utils.PaginatedResponse{data=[]responsemodels.PostResponse}
+// @Failure 401 {object} utils.ErrorResponseStruct
+// @Failure 500 {object} utils.ErrorResponseStruct
+// @Router /authors/{author_id}/posts [get]
 func (h *PostHandler) GetPostsbyAuthor(c echo.Context) error {
 	authorID, _ := strconv.Atoi(c.Param("author_id"))
 
@@ -129,9 +214,10 @@ func (h *PostHandler) GetPostsbyAuthor(c echo.Context) error {
 	}
 
 	var response []responsemodels.PostResponse
-	for _, p := range posts {
-		response = append(response, responsemodels.ToPostResponse(p))
+	for _, post := range posts {
+		response = append(response, responsemodels.ToPostResponse(post))
 	}
 
-	return utils.PaginatedResponse(c, http.StatusOK, "Posts retrieved successfully", response, p.Page, p.Limit, total)
+	paginated := utils.NewPaginatedResponse(response, p.Page, p.Limit, total)
+	return utils.SendPaginatedResponse(c, http.StatusOK, "Posts retrieved successfully", paginated)
 }

@@ -8,17 +8,29 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-func PaginatedResponse(c echo.Context, status int, message string, data interface{}, page, limit int, total int64) error {
+type PaginatedResponse struct {
+	Data       interface{} `json:"data"`
+	Page       int         `json:"page"`
+	Limit      int         `json:"limit"`
+	Total      int64       `json:"total"`
+	TotalPages int         `json:"totalPages"`
+}
+
+// NewPaginatedResponse constructs a PaginatedResponse and returns it
+func NewPaginatedResponse(data interface{}, page, limit int, total int64) PaginatedResponse {
 	totalPages := int((total + int64(limit) - 1) / int64(limit)) // round up
 
-	response := echo.Map{
-		"data":       data,
-		"page":       page,
-		"limit":      limit,
-		"total":      total,
-		"totalPages": totalPages,
+	return PaginatedResponse{
+		Data:       data,
+		Page:       page,
+		Limit:      limit,
+		Total:      total,
+		TotalPages: totalPages,
 	}
+}
 
+// SendPaginatedResponse is used to send a JSON response with pagination
+func SendPaginatedResponse(c echo.Context, status int, message string, response PaginatedResponse) error {
 	return JSONResponse(c, status, message, response)
 }
 

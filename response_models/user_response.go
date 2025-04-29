@@ -15,3 +15,15 @@ func ToUserResponse(u models.User) UserResponse {
 		Email: u.Email,
 	}
 }
+
+type LoginResponse struct {
+	User  UserResponse `json:"user"`
+	Token string       `json:"token"`
+}
+
+func NewLoginResponse(user UserResponse, token string) LoginResponse {
+	return LoginResponse{
+		User:  user,
+		Token: token,
+	}
+}
