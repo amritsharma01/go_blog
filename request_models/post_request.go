@@ -1,7 +1,10 @@
 package requestmodels
 
 // Mappers to models.Post
-import "crud_api/models"
+import (
+	"crud_api/models"
+	"strings"
+)
 
 type CreatePostRequest struct {
 	Title       string `json:"title" validate:"required"`
@@ -29,4 +32,9 @@ func FromUpdatePostRequest(post *models.Post, req UpdatePostRequest) {
 	post.Description = req.Description
 	post.CategoryID = req.CategoryID
 	post.Category = models.Category{}
+}
+
+func (r *CreatePostRequest) Sanitize() {
+	r.Title = strings.TrimSpace(r.Title)
+	r.Description = strings.TrimSpace(r.Description)
 }

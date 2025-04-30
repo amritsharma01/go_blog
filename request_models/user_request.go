@@ -1,11 +1,14 @@
 package requestmodels
 
-import "crud_api/models"
+import (
+	"crud_api/models"
+	"strings"
+)
 
 type CreateUserRequest struct {
-	Name     string `json:"name" validate:"required"`
-	Email    string `json:"email" validate:"required,email"`
-	Password string `json:"password" validate:"required"`
+	Name     string `json:"name" validate:"required,min=1"`
+	Email    string `json:"email" validate:"required,email,min=1"`
+	Password string `json:"password" validate:"required,min=6"`
 }
 
 type LoginRequest struct {
@@ -27,4 +30,10 @@ func FromUserLoginRequest(u LoginRequest) models.User {
 		Email:    u.Email,
 		Password: u.Password,
 	}
+}
+
+func (r *CreateUserRequest) Sanitize() {
+	r.Name = strings.TrimSpace(r.Name)
+	r.Email = strings.TrimSpace(r.Email)
+	r.Password = r.Password
 }

@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"crud_api/errors"
 	"crud_api/models"
 
 	"gorm.io/gorm"
@@ -21,17 +22,27 @@ func NewUserRepository(db *gorm.DB) UserRepository {
 }
 
 func (r *userRepository) Create(user *models.User) error {
-	return r.db.Create(user).Error
+	if err := r.db.Create(user).Error; err != nil {
+		return errors.Internal("Failed to create user", err)
+	}
+	return nil
 }
 
 func (r *userRepository) FindByEmail(email string) (*models.User, error) {
 	var user models.User
-	err := r.db.Where("email = ?", email).First(&user).Error
-	return &user, err
+	if err := r.db.Where("email = ?", email).First(&user).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, errors.NotFound("User not found")
+		}
+		return nil, errors.Internal("Database error", err)
+	}
+	return &user, nil
 }
 
 func (r *userRepository) FindAll() ([]models.User, error) {
 	var users []models.User
-	err := r.db.Find(&users).Error
-	return users, err
+	if err := r.db.Find(&users).Error; err != nil {
+		return nil, errors.Internal("Failed to retrieve users", err)
+	}
+	return users, nil
 }

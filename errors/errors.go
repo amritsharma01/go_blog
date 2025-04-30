@@ -2,11 +2,13 @@ package errors
 
 import "fmt"
 
-// Custom error type to represent a business logic error
+type ErrorCode string
+
+// AppError is a custom error for structured error handling
 type AppError struct {
-	Code    int    // HTTP status code or business error code
-	Message string // Error message
-	Err     error  // The underlying error (optional)
+	Code    int    // HTTP status code
+	Message string // User-facing error message
+	Err     error  // Root/internal error
 }
 
 func (e *AppError) Error() string {
@@ -16,19 +18,38 @@ func (e *AppError) Error() string {
 	return fmt.Sprintf("Code: %d, Message: %s", e.Code, e.Message)
 }
 
-// Helper function to create a new error
+// Constructors
+
 func New(code int, message string, err error) *AppError {
-	return &AppError{
-		Code:    code,
-		Message: message,
-		Err:     err,
-	}
+	return &AppError{Code: code, Message: message, Err: err}
 }
 
-// Helper function to create a new error with no underlying error
 func NewWithMessage(code int, message string) *AppError {
-	return &AppError{
-		Code:    code,
-		Message: message,
-	}
+	return &AppError{Code: code, Message: message}
+}
+
+// Common HTTP error constructors
+
+func BadRequest(message string) *AppError {
+	return NewWithMessage(400, message)
+}
+
+func Unauthorized(message string) *AppError {
+	return NewWithMessage(401, message)
+}
+
+func Forbidden(message string) *AppError {
+	return NewWithMessage(403, message)
+}
+
+func NotFound(message string) *AppError {
+	return NewWithMessage(404, message)
+}
+
+func Conflict(message string) *AppError {
+	return NewWithMessage(409, message)
+}
+
+func Internal(message string, err error) *AppError {
+	return New(500, message, err)
 }

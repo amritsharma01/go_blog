@@ -6,10 +6,7 @@ import (
 	"crud_api/services"
 	"crud_api/utils"
 	"net/http"
-	"os"
-	"time"
 
-	"github.com/golang-jwt/jwt"
 	"github.com/labstack/echo/v4"
 )
 
@@ -33,20 +30,21 @@ func NewUserHandler(service services.UserService) *UserHandler {
 // @Failure 409 {object} utils.ErrorResponseStruct
 // @Failure 500 {object} utils.ErrorResponseStruct
 // @Router /auth/register [post]
+
 func (h *UserHandler) Register(c echo.Context) error {
 	var req requestmodels.CreateUserRequest
-
 	if err := c.Bind(&req); err != nil {
 		return utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body")
 	}
 
-	user := requestmodels.FromUserCreateRequest(req)
+	req.Sanitize()
+	if req.Email == "" || req.Password == "" || req.Name == "" {
+		return utils.ErrorResponse(c, http.StatusBadRequest, "Missing required fields")
+	}
 
+	user := requestmodels.FromUserCreateRequest(req)
 	if err := h.service.Register(&user); err != nil {
-		if err == services.ErrEmailAlreadyExists {
-			return utils.ErrorResponse(c, http.StatusConflict, "Email already exists")
-		}
-		return utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to register user")
+		return HandleAppError(c, err, "Unexpected error happened diring registering user")
 	}
 
 	return utils.JSONResponse(c, http.StatusCreated, "User created successfully", responsemodels.ToUserResponse(user))
@@ -64,34 +62,24 @@ func (h *UserHandler) Register(c echo.Context) error {
 // @Failure 401 {object} utils.ErrorResponseStruct
 // @Failure 500 {object} utils.ErrorResponseStruct
 // @Router /auth/login [post]
+
 func (h *UserHandler) Login(c echo.Context) error {
 	var req requestmodels.LoginRequest
-
 	if err := c.Bind(&req); err != nil {
 		return utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body")
 	}
 
-	loginData := requestmodels.FromUserLoginRequest(req)
+	if req.Email == "" || req.Password == "" {
+		return utils.ErrorResponse(c, http.StatusBadRequest, "Missing email or password")
+	}
 
-	dbUser, err := h.service.Login(loginData.Email, loginData.Password)
+	user, token, err := h.service.Authenticate(req.Email, req.Password)
 	if err != nil {
-		return utils.ErrorResponse(c, http.StatusUnauthorized, "Invalid credentials")
+		return HandleAppError(c, err, "Unexpected error happened during login")
 	}
 
-	jwtSecret := []byte(os.Getenv("JWT_SECRET"))
-	claims := jwt.MapClaims{
-		"user_id": dbUser.ID,
-		"exp":     time.Now().Add(time.Hour * 24).Unix(),
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	signedToken, err := token.SignedString(jwtSecret)
-	if err != nil {
-		return utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to generate token")
-	}
-
-	loginResp := responsemodels.NewLoginResponse(responsemodels.ToUserResponse(*dbUser), signedToken)
-	return utils.JSONResponse(c, http.StatusOK, "Login successful", loginResp)
+	resp := responsemodels.NewLoginResponse(responsemodels.ToUserResponse(*user), token)
+	return utils.JSONResponse(c, http.StatusOK, "Login successful", resp)
 }
 
 // GetAllUsers godoc
@@ -108,7 +96,7 @@ func (h *UserHandler) Login(c echo.Context) error {
 func (h *UserHandler) GetAllUsers(c echo.Context) error {
 	users, err := h.service.GetAllUsers()
 	if err != nil {
-		return utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to retrieve users")
+		return HandleAppError(c, err, "Unexpected error occoured during retrieving")
 	}
 
 	var response []responsemodels.UserResponse
