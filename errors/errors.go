@@ -1,55 +1,138 @@
+// errors/errors.go
 package errors
 
-import "fmt"
+import (
+	"fmt"
+	"log"
+	"net/http"
 
-type ErrorCode string
+	"github.com/labstack/echo/v4"
+)
 
-// AppError is a custom error for structured error handling
-type AppError struct {
-	Code    int    // HTTP status code
-	Message string // User-facing error message
-	Err     error  // Root/internal error
+type AppErrors struct {
+	Code        int    `json:"-"`       // HTTP status code
+	Message     string `json:"message"` // User-friendly message
+	InternalMsg string `json:"-"`       // Internal message for logging
+	Err         error  `json:"-"`       // Original error
 }
 
-func (e *AppError) Error() string {
+func (e *AppErrors) Error() string {
 	if e.Err != nil {
-		return fmt.Sprintf("Code: %d, Message: %s, Details: %v", e.Code, e.Message, e.Err)
+		return fmt.Sprintf("%s: %v", e.InternalMsg, e.Err)
 	}
-	return fmt.Sprintf("Code: %d, Message: %s", e.Code, e.Message)
+	return e.InternalMsg
 }
 
-// Constructors
-
-func New(code int, message string, err error) *AppError {
-	return &AppError{Code: code, Message: message, Err: err}
+func (e *AppErrors) Unwrap() error {
+	return e.Err
 }
 
-func NewWithMessage(code int, message string) *AppError {
-	return &AppError{Code: code, Message: message}
+// ErrorResponse
+type ErrorResponse struct {
+	Status  int    `json:"status"`
+	Message string `json:"error"`
 }
 
-// Common HTTP error constructors
-
-func BadRequest(message string) *AppError {
-	return NewWithMessage(400, message)
+// Constructor functions for different error types
+func BadRequest(userMsg string, InternalMsg string, err ...error) *AppErrors {
+	var originalErr error
+	if len(err) > 0 {
+		originalErr = err[0]
+	}
+	return &AppErrors{
+		Code:        http.StatusBadRequest,
+		Message:     userMsg,
+		InternalMsg: InternalMsg,
+		Err:         originalErr,
+	}
 }
 
-func Unauthorized(message string) *AppError {
-	return NewWithMessage(401, message)
+func NotFound(userMsg string, InternalMsg string, err ...error) *AppErrors {
+	var originalErr error
+	if len(err) > 0 {
+		originalErr = err[0]
+	}
+	return &AppErrors{
+		Code:        http.StatusNotFound,
+		Message:     userMsg,
+		InternalMsg: InternalMsg,
+		Err:         originalErr,
+	}
 }
 
-func Forbidden(message string) *AppError {
-	return NewWithMessage(403, message)
+func Conflict(userMsg string, InternalMsg string, err ...error) *AppErrors {
+	var originalErr error
+	if len(err) > 0 {
+		originalErr = err[0]
+	}
+	return &AppErrors{
+		Code:        http.StatusConflict,
+		Message:     userMsg,
+		InternalMsg: InternalMsg,
+		Err:         originalErr,
+	}
 }
 
-func NotFound(message string) *AppError {
-	return NewWithMessage(404, message)
+func Internal(userMsg string, InternalMsg string, err ...error) *AppErrors {
+	var originalErr error
+	if len(err) > 0 {
+		originalErr = err[0]
+	}
+	return &AppErrors{
+		Code:        http.StatusInternalServerError,
+		Message:     userMsg,
+		InternalMsg: InternalMsg,
+		Err:         originalErr,
+	}
 }
 
-func Conflict(message string) *AppError {
-	return NewWithMessage(409, message)
+func Forbidden(userMsg string, InternalMsg string, err ...error) *AppErrors {
+	var originalErr error
+	if len(err) > 0 {
+		originalErr = err[0]
+	}
+	return &AppErrors{
+		Code:        http.StatusForbidden,
+		Message:     userMsg,
+		InternalMsg: InternalMsg,
+		Err:         originalErr,
+	}
 }
 
-func Internal(message string, err error) *AppError {
-	return New(500, message, err)
+func HandleError(c echo.Context, err error, defaultUserMsg string) error {
+	statusCode := http.StatusInternalServerError
+	userMsg := defaultUserMsg
+	if userMsg == "" {
+		userMsg = "An unexpected error occurred"
+	}
+	if appErr, ok := err.(*AppErrors); ok {
+		logErrorWithSeverity(appErr)
+
+		statusCode = appErr.Code
+		if appErr.Message != "" {
+			userMsg = appErr.Message
+		}
+	} else {
+		log.Printf("SEVERE: Unhandled error: %v", err)
+	}
+
+	return c.JSON(statusCode, ErrorResponse{
+		Status:  statusCode,
+		Message: userMsg,
+	})
+}
+
+func logErrorWithSeverity(appErr *AppErrors) {
+	prefix := "INFO"
+	if appErr.Code >= 400 && appErr.Code < 500 {
+		prefix = "WARNING"
+	} else if appErr.Code >= 500 {
+		prefix = "SEVERE"
+	}
+
+	if appErr.Err != nil {
+		log.Printf("%s: %s - Original error: %v", prefix, appErr.InternalMsg, appErr.Err)
+	} else {
+		log.Printf("%s: %s", prefix, appErr.InternalMsg)
+	}
 }

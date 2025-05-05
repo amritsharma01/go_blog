@@ -15,6 +15,7 @@ type UserService interface {
 	Register(user *models.User) error
 	Authenticate(email, password string) (*models.User, string, error)
 	GetAllUsers() ([]models.User, error)
+	GetByID(id uint) (*models.User, error)
 }
 
 type userService struct {
@@ -27,19 +28,25 @@ func NewUserService(repo repositories.UserRepository) UserService {
 
 func (s *userService) Register(user *models.User) error {
 	existingUser, err := s.repo.FindByEmail(user.Email)
-	if err == nil && existingUser != nil {
-		return errors.Conflict("User with this email already exists")
+	if err != nil {
+		// Allow only "not found" errors to proceed with creation
+		if appErr, ok := err.(*errors.AppErrors); ok && appErr.Code == 404 {
+			hashedPassword, errHash := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+			if errHash != nil {
+				return errors.Internal("Failed to register the user", "Error hashing password", errHash)
+			}
+			user.Password = string(hashedPassword)
+			if createdErr := s.repo.Create(user); createdErr != nil {
+				return createdErr
+			}
+			return nil
+		}
+		return err
+	}
+	if existingUser != nil {
+		return errors.Conflict("Failed to login with the given crrdentials", "Attempted to create a duplicate user")
 	}
 
-	hashedPassword, errHash := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
-	if errHash != nil {
-		return errors.Internal("Password hashing failed", errHash)
-	}
-	user.Password = string(hashedPassword)
-
-	if errCreate := s.repo.Create(user); errCreate != nil {
-		return errCreate
-	}
 	return nil
 }
 
@@ -50,7 +57,7 @@ func (s *userService) Authenticate(email, password string) (*models.User, string
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
-		return nil, "", errors.Unauthorized("Invalid email or password")
+		return nil, "", errors.Internal("Invalid email or password", "User tried logging in with invalid email and password", err)
 	}
 
 	// JWT generation
@@ -63,7 +70,7 @@ func (s *userService) Authenticate(email, password string) (*models.User, string
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	signedToken, err := token.SignedString(jwtSecret)
 	if err != nil {
-		return nil, "", errors.Internal("Failed to generate token", err)
+		return nil, "", err
 	}
 
 	return user, signedToken, nil
@@ -71,4 +78,8 @@ func (s *userService) Authenticate(email, password string) (*models.User, string
 
 func (s *userService) GetAllUsers() ([]models.User, error) {
 	return s.repo.FindAll()
+}
+
+func (s *userService) GetByID(id uint) (*models.User, error) {
+	return s.repo.FindByID(id)
 }

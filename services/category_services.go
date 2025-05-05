@@ -24,17 +24,22 @@ func NewCategoryService(repo repositories.CategoryRepository) CategoryService {
 func (s *categoryService) AddCategory(category *models.Category) error {
 	existingCategory, err := s.repo.FindByName(category.Name)
 	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok && appErr.Code == 404 {
-			// Category does not exist, proceed to create it
-		} else {
-			return err
+		if appErr, ok := err.(*errors.AppErrors); ok && appErr.Code == 404 {
+			// Proceed to create since it doesn't exist
+			if createErr := s.repo.Create(category); createErr != nil {
+				return errors.Internal("Failed to create category", "Database error while creating category", err)
+			}
+			return nil
 		}
-	} else if existingCategory != nil {
-		return errors.NewWithMessage(409, "Category already exists")
+		return err
 	}
 
-	if err := s.repo.Create(category); err != nil {
-		return errors.Internal("Failed to create category", err)
+	// If it already exists, return Conflict1 error
+	if existingCategory != nil {
+		return errors.Conflict(
+			"Category already exists",
+			"Attempted to create a duplicate category",
+		)
 	}
 
 	return nil
@@ -43,7 +48,7 @@ func (s *categoryService) AddCategory(category *models.Category) error {
 func (s *categoryService) GetCategories(limit, offset int) ([]models.Category, int64, error) {
 	categories, total, err := s.repo.List(limit, offset)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, err // Error already wrapped in repository
 	}
 	return categories, total, nil
 }
@@ -51,14 +56,14 @@ func (s *categoryService) GetCategories(limit, offset int) ([]models.Category, i
 func (s *categoryService) GetByID(id uint) (*models.Category, error) {
 	category, err := s.repo.FindByID(id)
 	if err != nil {
-		return nil, err
+		return nil, err // Error already wrapped in repository
 	}
 	return category, nil
 }
 
 func (s *categoryService) DeleteCategory(category *models.Category) error {
 	if err := s.repo.Delete(category); err != nil {
-		return errors.Internal("Failed to delete category", err)
+		return err // Error already wrapped in repository
 	}
 	return nil
 }

@@ -18,6 +18,10 @@ type UpdatePostRequest struct {
 	CategoryID  uint   `json:"category_id,omitempty"` // optional
 }
 
+func (u UpdatePostRequest) Sanitize() {
+	panic("unimplemented")
+}
+
 func FromCreatePostRequest(req CreatePostRequest, authorID uint) models.Post {
 	return models.Post{
 		Title:       req.Title,

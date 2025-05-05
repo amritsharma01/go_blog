@@ -1,6 +1,6 @@
 // utils/pagination.go
 
-package utils
+package responsemodels
 
 import (
 	"strconv"

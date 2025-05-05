@@ -1,5 +1,12 @@
 basePath: /
 definitions:
+  errors.ErrorResponse:
+    properties:
+      error:
+        type: string
+      status:
+        type: integer
+    type: object
   requestmodels.CategoryRequest:
     properties:
       name:
@@ -23,10 +30,13 @@ definitions:
   requestmodels.CreateUserRequest:
     properties:
       email:
+        minLength: 1
         type: string
       name:
+        minLength: 1
         type: string
       password:
+        minLength: 6
         type: string
     required:
     - email
@@ -79,12 +89,30 @@ definitions:
       cname:
         type: string
     type: object
+  responsemodels.JSONResponseStruct:
+    properties:
+      data: {}
+      message:
+        type: string
+    type: object
   responsemodels.LoginResponse:
     properties:
       token:
         type: string
       user:
         $ref: '#/definitions/responsemodels.UserResponse'
+    type: object
+  responsemodels.PaginatedResponse:
+    properties:
+      data: {}
+      limit:
+        type: integer
+      page:
+        type: integer
+      total:
+        type: integer
+      totalPages:
+        type: integer
     type: object
   responsemodels.PostResponse:
     properties:
@@ -110,30 +138,7 @@ definitions:
       name:
         type: string
     type: object
-  utils.ErrorResponseStruct:
-    properties:
-      error:
-        type: string
-    type: object
-  utils.JSONResponseStruct:
-    properties:
-      data: {}
-      message:
-        type: string
-    type: object
-  utils.PaginatedResponse:
-    properties:
-      data: {}
-      limit:
-        type: integer
-      page:
-        type: integer
-      total:
-        type: integer
-      totalPages:
-        type: integer
-    type: object
-host: localhost:8080
+host: localhost:8000
 info:
   contact:
     email: support@swagger.io
@@ -147,7 +152,7 @@ info:
   title: CRUD API
   version: "1.0"
 paths:
-  /auth/login:
+  /v1/auth/login:
     post:
       consumes:
       - application/json
@@ -166,27 +171,36 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/utils.JSONResponseStruct'
+            - $ref: '#/definitions/responsemodels.JSONResponseStruct'
             - properties:
                 data:
-                  $ref: '#/definitions/responsemodels.LoginResponse'
+                  allOf:
+                  - $ref: '#/definitions/responsemodels.LoginResponse'
+                  - properties:
+                      user:
+                        $ref: '#/definitions/responsemodels.UserResponse'
+                    type: object
               type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/utils.ErrorResponseStruct'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/utils.ErrorResponseStruct'
+            $ref: '#/definitions/errors.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/errors.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/errors.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/utils.ErrorResponseStruct'
+            $ref: '#/definitions/errors.ErrorResponse'
       summary: Authenticate user
       tags:
       - users
-  /auth/register:
+  /v1/auth/register:
     post:
       consumes:
       - application/json
@@ -205,27 +219,31 @@ paths:
           description: Created
           schema:
             allOf:
-            - $ref: '#/definitions/utils.JSONResponseStruct'
+            - $ref: '#/definitions/responsemodels.JSONResponseStruct'
             - properties:
                 data:
                   $ref: '#/definitions/responsemodels.UserResponse'
               type: object
-        "400":
-          description: Bad Request
+        "401":
+          description: Unauthorized
           schema:
-            $ref: '#/definitions/utils.ErrorResponseStruct'
-        "409":
-          description: Conflict
+            $ref: '#/definitions/errors.ErrorResponse'
+        "403":
+          description: Forbidden
           schema:
-            $ref: '#/definitions/utils.ErrorResponseStruct'
+            $ref: '#/definitions/errors.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/errors.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/utils.ErrorResponseStruct'
+            $ref: '#/definitions/errors.ErrorResponse'
       summary: Register a new user
       tags:
       - users
-  /authors/{author_id}/posts:
+  /v1/authors/{author_id}/posts:
     get:
       consumes:
       - application/json
@@ -253,7 +271,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/utils.PaginatedResponse'
+            - $ref: '#/definitions/responsemodels.PaginatedResponse'
             - properties:
                 data:
                   items:
@@ -263,17 +281,29 @@ paths:
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/utils.ErrorResponseStruct'
+            $ref: '#/definitions/errors.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/errors.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/errors.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/errors.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/utils.ErrorResponseStruct'
+            $ref: '#/definitions/errors.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Get posts by author
       tags:
       - posts
-  /categories:
+  /v1/categories:
     get:
       consumes:
       - application/json
@@ -296,17 +326,33 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/utils.PaginatedResponse'
+            - $ref: '#/definitions/responsemodels.PaginatedResponse'
             - properties:
                 data:
                   items:
                     $ref: '#/definitions/responsemodels.CategoryResponse'
                   type: array
               type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/errors.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/errors.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/errors.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/errors.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/utils.ErrorResponseStruct'
+            $ref: '#/definitions/errors.ErrorResponse'
       summary: List categories
       tags:
       - categories
@@ -328,29 +374,37 @@ paths:
           description: Created
           schema:
             allOf:
-            - $ref: '#/definitions/utils.JSONResponseStruct'
+            - $ref: '#/definitions/responsemodels.JSONResponseStruct'
             - properties:
                 data:
                   $ref: '#/definitions/responsemodels.CategoryResponse'
               type: object
-        "400":
-          description: Bad Request
+        "401":
+          description: Unauthorized
           schema:
-            $ref: '#/definitions/utils.ErrorResponseStruct'
+            $ref: '#/definitions/errors.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/errors.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/errors.ErrorResponse'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/utils.ErrorResponseStruct'
+            $ref: '#/definitions/errors.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/utils.ErrorResponseStruct'
+            $ref: '#/definitions/errors.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Add a new category
       tags:
       - categories
-  /categories/{id}:
+  /v1/categories/{id}:
     delete:
       consumes:
       - application/json
@@ -364,28 +418,32 @@ paths:
       produces:
       - application/json
       responses:
-        "200":
-          description: OK
+        "401":
+          description: Unauthorized
           schema:
-            $ref: '#/definitions/utils.JSONResponseStruct'
+            $ref: '#/definitions/errors.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/utils.ErrorResponseStruct'
+            $ref: '#/definitions/errors.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/utils.ErrorResponseStruct'
+            $ref: '#/definitions/errors.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/errors.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/utils.ErrorResponseStruct'
+            $ref: '#/definitions/errors.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Delete a category
       tags:
       - categories
-  /posts:
+  /v1/posts:
     get:
       consumes:
       - application/json
@@ -420,17 +478,33 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/utils.PaginatedResponse'
+            - $ref: '#/definitions/responsemodels.PaginatedResponse'
             - properties:
                 data:
                   items:
                     $ref: '#/definitions/responsemodels.PostResponse'
                   type: array
               type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/errors.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/errors.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/errors.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/errors.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/utils.ErrorResponseStruct'
+            $ref: '#/definitions/errors.ErrorResponse'
       summary: Get list of posts
       tags:
       - posts
@@ -452,37 +526,37 @@ paths:
           description: Created
           schema:
             allOf:
-            - $ref: '#/definitions/utils.JSONResponseStruct'
+            - $ref: '#/definitions/responsemodels.JSONResponseStruct'
             - properties:
                 data:
                   $ref: '#/definitions/responsemodels.PostResponse'
               type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/utils.ErrorResponseStruct'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/utils.ErrorResponseStruct'
+            $ref: '#/definitions/errors.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/utils.ErrorResponseStruct'
+            $ref: '#/definitions/errors.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/errors.ErrorResponse'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/utils.ErrorResponseStruct'
+            $ref: '#/definitions/errors.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/utils.ErrorResponseStruct'
+            $ref: '#/definitions/errors.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Create a new post
       tags:
       - posts
-  /posts/{id}:
+  /v1/posts/{id}:
     delete:
       consumes:
       - application/json
@@ -499,23 +573,27 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/utils.JSONResponseStruct'
+            $ref: '#/definitions/responsemodels.JSONResponseStruct'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/utils.ErrorResponseStruct'
+            $ref: '#/definitions/errors.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/utils.ErrorResponseStruct'
+            $ref: '#/definitions/errors.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/utils.ErrorResponseStruct'
+            $ref: '#/definitions/errors.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/errors.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/utils.ErrorResponseStruct'
+            $ref: '#/definitions/errors.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Delete a post
@@ -538,19 +616,31 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/utils.JSONResponseStruct'
+            - $ref: '#/definitions/responsemodels.JSONResponseStruct'
             - properties:
                 data:
                   $ref: '#/definitions/responsemodels.PostResponse'
               type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/errors.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/errors.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/utils.ErrorResponseStruct'
+            $ref: '#/definitions/errors.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/errors.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/utils.ErrorResponseStruct'
+            $ref: '#/definitions/errors.ErrorResponse'
       summary: Get post details
       tags:
       - posts
@@ -577,37 +667,37 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/utils.JSONResponseStruct'
+            - $ref: '#/definitions/responsemodels.JSONResponseStruct'
             - properties:
                 data:
                   $ref: '#/definitions/responsemodels.PostResponse'
               type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/utils.ErrorResponseStruct'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/utils.ErrorResponseStruct'
+            $ref: '#/definitions/errors.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/utils.ErrorResponseStruct'
+            $ref: '#/definitions/errors.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/utils.ErrorResponseStruct'
+            $ref: '#/definitions/errors.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/errors.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/utils.ErrorResponseStruct'
+            $ref: '#/definitions/errors.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Update a post
       tags:
       - posts
-  /users:
+  /v1/users:
     get:
       description: Retrieve list of all users (requires admin JWT)
       produces:
@@ -617,7 +707,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/utils.PaginatedResponse'
+            - $ref: '#/definitions/responsemodels.PaginatedResponse'
             - properties:
                 data:
                   items:
@@ -627,15 +717,19 @@ paths:
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/utils.ErrorResponseStruct'
+            $ref: '#/definitions/errors.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/utils.ErrorResponseStruct'
+            $ref: '#/definitions/errors.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/errors.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/utils.ErrorResponseStruct'
+            $ref: '#/definitions/errors.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Get all users

@@ -5,7 +5,7 @@ import (
 	requestmodels "crud_api/request_models"
 	responsemodels "crud_api/response_models"
 	"crud_api/services"
-	"crud_api/utils"
+
 	"net/http"
 	"strconv"
 
@@ -29,22 +29,38 @@ func NewCategoryHandler(service services.CategoryService) *CategoryHandler {
 // @Produce json
 // @Security BearerAuth
 // @Param category body requestmodels.CategoryRequest true "Category data"
-// @Success 201 {object} utils.JSONResponseStruct{data=responsemodels.CategoryResponse}
-// @Failure 400 {object} utils.ErrorResponseStruct
-// @Failure 409 {object} utils.ErrorResponseStruct
-// @Failure 500 {object} utils.ErrorResponseStruct
-// @Router /categories [post]
+// @Success 201 {object} responsemodels.JSONResponseStruct{data=responsemodels.CategoryResponse}
+// @Failure 401 {object} errors.ErrorResponse
+// @Failure 403 {object} errors.ErrorResponse
+// @Failure 404 {object} errors.ErrorResponse
+// @Failure 409 {object} errors.ErrorResponse
+// @Failure 500 {object} errors.ErrorResponse
+// @Router /v1/categories [post]
 func (h *CategoryHandler) AddCategory(c echo.Context) error {
 	var req requestmodels.CategoryRequest
 
 	// Bind incoming JSON request
 	if err := c.Bind(&req); err != nil {
-		return utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body")
+		return errors.HandleError(c,
+			errors.BadRequest(
+				"Invalid request body",
+				"Failed to bind request body",
+				err,
+			),
+			"",
+		)
 	}
 
 	// Check if category name is provided
 	if req.Name == "" {
-		return utils.ErrorResponse(c, http.StatusBadRequest, "Category name is required")
+		return errors.HandleError(c,
+			errors.BadRequest(
+				"Category name is required",
+				"Client sent empty category name",
+				nil,
+			),
+			"",
+		)
 	}
 
 	// Convert to domain model
@@ -52,12 +68,11 @@ func (h *CategoryHandler) AddCategory(c echo.Context) error {
 
 	// Add category through service layer
 	if err := h.service.AddCategory(&category); err != nil {
-		// Check if the error is an AppError
-		HandleAppError(c, err, "Failed to create category")
+		return errors.HandleError(c, err, "Failed to create category")
 	}
 
 	// Return success response with category details
-	return utils.JSONResponse(c, http.StatusCreated, "Category created successfully", responsemodels.ToCatResponse(category))
+	return responsemodels.JSONResponse(c, http.StatusCreated, "Category created successfully", responsemodels.ToCatResponse(category))
 }
 
 // ListCategories godoc
@@ -68,18 +83,21 @@ func (h *CategoryHandler) AddCategory(c echo.Context) error {
 // @Produce json
 // @Param page query int false "Page number" default(1)
 // @Param limit query int false "Items per page" default(10)
-// @Success 200 {object} utils.PaginatedResponse{data=[]responsemodels.CategoryResponse}
-// @Failure 500 {object} utils.ErrorResponseStruct
-// @Router /categories [get]
+// @Success 200 {object} responsemodels.PaginatedResponse{data=[]responsemodels.CategoryResponse}
+// @Failure 401 {object} errors.ErrorResponse
+// @Failure 403 {object} errors.ErrorResponse
+// @Failure 404 {object} errors.ErrorResponse
+// @Failure 409 {object} errors.ErrorResponse
+// @Failure 500 {object} errors.ErrorResponse
+// @Router /v1/categories [get]
 func (h *CategoryHandler) ListCategories(c echo.Context) error {
 	// Get pagination details
-	p := utils.GetPagination(c)
+	p := responsemodels.GetPagination(c)
 
 	// Fetch categories from service
 	categories, total, err := h.service.GetCategories(p.Limit, p.Offset)
 	if err != nil {
-		// Check if the error is an AppError
-		HandleAppError(c, err, "Failed to retrieve categories")
+		return errors.HandleError(c, err, "Failed to retrieve categories")
 	}
 
 	// Convert categories to response models
@@ -89,8 +107,8 @@ func (h *CategoryHandler) ListCategories(c echo.Context) error {
 	}
 
 	// Return paginated response
-	paginated := utils.NewPaginatedResponse(response, p.Page, p.Limit, total)
-	return utils.SendPaginatedResponse(c, http.StatusOK, "Categories retrieved successfully", paginated)
+	paginated := responsemodels.NewPaginatedResponse(response, p.Page, p.Limit, total)
+	return responsemodels.SendPaginatedResponse(c, http.StatusOK, "Categories retrieved successfully", paginated)
 }
 
 // DeleteCategory godoc
@@ -101,30 +119,37 @@ func (h *CategoryHandler) ListCategories(c echo.Context) error {
 // @Produce json
 // @Security BearerAuth
 // @Param id path int true "Category ID"
-// @Success 200 {object} utils.JSONResponseStruct
-// @Failure 403 {object} utils.ErrorResponseStruct
-// @Failure 404 {object} utils.ErrorResponseStruct
-// @Failure 500 {object} utils.ErrorResponseStruct
-// @Router /categories/{id} [delete]
+// @Failure 401 {object} errors.ErrorResponse
+// @Failure 403 {object} errors.ErrorResponse
+// @Failure 404 {object} errors.ErrorResponse
+// @Failure 409 {object} errors.ErrorResponse
+// @Failure 500 {object} errors.ErrorResponse
+// @Router /v1/categories/{id} [delete]
 func (h *CategoryHandler) DeleteCategory(c echo.Context) error {
 	// Extract category ID from URL parameter
-	id, _ := strconv.Atoi(c.Param("id"))
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		return errors.HandleError(c,
+			errors.BadRequest(
+				"Invalid category ID",
+				"Failed to parse category ID as integer",
+				err,
+			),
+			"",
+		)
+	}
 
 	// Fetch category by ID from service layer
 	cat, err := h.service.GetByID(uint(id))
 	if err != nil {
-		HandleAppError(c, err, "failed to delete the category")
+		return errors.HandleError(c, err, "Failed to delete category")
 	}
 
 	// Attempt to delete category through service layer
 	if err := h.service.DeleteCategory(cat); err != nil {
-		// Check if the error is an AppError
-		if appErr, ok := err.(*errors.AppError); ok {
-			return utils.ErrorResponse(c, appErr.Code, appErr.Message)
-		}
-		return utils.ErrorResponse(c, http.StatusForbidden, "Unable to delete category")
+		return errors.HandleError(c, err, "Failed to delete category")
 	}
 
 	// Return success response
-	return utils.JSONResponse(c, http.StatusOK, "Category deleted successfully", nil)
+	return responsemodels.JSONResponse(c, http.StatusOK, "Category deleted successfully", nil)
 }

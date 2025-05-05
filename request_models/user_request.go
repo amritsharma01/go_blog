@@ -35,5 +35,11 @@ func FromUserLoginRequest(u LoginRequest) models.User {
 func (r *CreateUserRequest) Sanitize() {
 	r.Name = strings.TrimSpace(r.Name)
 	r.Email = strings.TrimSpace(r.Email)
-	r.Password = r.Password
+
+}
+
+func (r *LoginRequest) Sanitize() {
+
+	r.Email = strings.TrimSpace(r.Email)
+
 }

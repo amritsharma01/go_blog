@@ -1,10 +1,11 @@
 package handlers
 
 import (
+	"crud_api/errors"
 	requestmodels "crud_api/request_models"
 	responsemodels "crud_api/response_models"
 	"crud_api/services"
-	"crud_api/utils"
+
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -25,29 +26,45 @@ func NewUserHandler(service services.UserService) *UserHandler {
 // @Accept json
 // @Produce json
 // @Param user body requestmodels.CreateUserRequest true "User registration data"
-// @Success 201 {object} utils.JSONResponseStruct{data=responsemodels.UserResponse}
-// @Failure 400 {object} utils.ErrorResponseStruct
-// @Failure 409 {object} utils.ErrorResponseStruct
-// @Failure 500 {object} utils.ErrorResponseStruct
-// @Router /auth/register [post]
-
+// @Success 201 {object} responsemodels.JSONResponseStruct{data=responsemodels.UserResponse}
+// @Failure 401 {object} errors.ErrorResponse
+// @Failure 403 {object} errors.ErrorResponse
+// @Failure 404 {object} errors.ErrorResponse
+// @Failure 500 {object} errors.ErrorResponse
+// @Router /v1/auth/register [post]
 func (h *UserHandler) Register(c echo.Context) error {
 	var req requestmodels.CreateUserRequest
-	if err := c.Bind(&req); err != nil {
-		return utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body")
-	}
 
+	// Bind incoming JSON request
+	if err := c.Bind(&req); err != nil {
+		return errors.HandleError(c,
+			errors.BadRequest(
+				"Invalid request body",
+				"Failed to bind request body",
+				err,
+			),
+			"",
+		)
+	}
 	req.Sanitize()
+	// Check if category name is provided
 	if req.Email == "" || req.Password == "" || req.Name == "" {
-		return utils.ErrorResponse(c, http.StatusBadRequest, "Missing required fields")
+		return errors.HandleError(c,
+			errors.BadRequest(
+				"Username, password and email is required",
+				"Client sent emmpy name, email or password",
+				nil,
+			),
+			"",
+		)
 	}
 
 	user := requestmodels.FromUserCreateRequest(req)
 	if err := h.service.Register(&user); err != nil {
-		return HandleAppError(c, err, "Unexpected error happened diring registering user")
+		return errors.HandleError(c, err, "")
 	}
 
-	return utils.JSONResponse(c, http.StatusCreated, "User created successfully", responsemodels.ToUserResponse(user))
+	return responsemodels.JSONResponse(c, http.StatusCreated, "User created successfully", responsemodels.ToUserResponse(user))
 }
 
 // Login godoc
@@ -57,29 +74,48 @@ func (h *UserHandler) Register(c echo.Context) error {
 // @Accept json
 // @Produce json
 // @Param credentials body requestmodels.LoginRequest true "Login credentials"
-// @Success 200 {object} utils.JSONResponseStruct{data=responsemodels.LoginResponse}
-// @Failure 400 {object} utils.ErrorResponseStruct
-// @Failure 401 {object} utils.ErrorResponseStruct
-// @Failure 500 {object} utils.ErrorResponseStruct
-// @Router /auth/login [post]
-
+// @Success 200 {object} responsemodels.JSONResponseStruct{data=responsemodels.LoginResponse{user=responsemodels.UserResponse}}
+// @Failure 401 {object} errors.ErrorResponse
+// @Failure 403 {object} errors.ErrorResponse
+// @Failure 404 {object} errors.ErrorResponse
+// @Failure 500 {object} errors.ErrorResponse
+// @Router /v1/auth/login [post]
 func (h *UserHandler) Login(c echo.Context) error {
 	var req requestmodels.LoginRequest
+
+	// Bind incoming JSON request
 	if err := c.Bind(&req); err != nil {
-		return utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body")
+		return errors.HandleError(c,
+			errors.BadRequest(
+				"Invalid request body",
+				"Failed to bind request body",
+				err,
+			),
+			"",
+		)
 	}
 
+	req.Sanitize()
+
+	// Check if category name is provided
 	if req.Email == "" || req.Password == "" {
-		return utils.ErrorResponse(c, http.StatusBadRequest, "Missing email or password")
+		return errors.HandleError(c,
+			errors.BadRequest(
+				"Email or password is required",
+				"Client sent empty email or password",
+				nil,
+			),
+			"",
+		)
 	}
 
 	user, token, err := h.service.Authenticate(req.Email, req.Password)
 	if err != nil {
-		return HandleAppError(c, err, "Unexpected error happened during login")
+		return errors.HandleError(c, err, "")
 	}
 
 	resp := responsemodels.NewLoginResponse(responsemodels.ToUserResponse(*user), token)
-	return utils.JSONResponse(c, http.StatusOK, "Login successful", resp)
+	return responsemodels.JSONResponse(c, http.StatusOK, "Login successful", resp)
 }
 
 // GetAllUsers godoc
@@ -88,15 +124,16 @@ func (h *UserHandler) Login(c echo.Context) error {
 // @Tags users
 // @Security BearerAuth
 // @Produce json
-// @Success 200 {object} utils.PaginatedResponse{data=[]responsemodels.UserResponse}
-// @Failure 401 {object} utils.ErrorResponseStruct
-// @Failure 403 {object} utils.ErrorResponseStruct
-// @Failure 500 {object} utils.ErrorResponseStruct
-// @Router /users [get]
+// @Success 200 {object} responsemodels.PaginatedResponse{data=[]responsemodels.UserResponse}
+// @Failure 401 {object} errors.ErrorResponse
+// @Failure 403 {object} errors.ErrorResponse
+// @Failure 404 {object} errors.ErrorResponse
+// @Failure 500 {object} errors.ErrorResponse
+// @Router /v1/users [get]
 func (h *UserHandler) GetAllUsers(c echo.Context) error {
 	users, err := h.service.GetAllUsers()
 	if err != nil {
-		return HandleAppError(c, err, "Unexpected error occoured during retrieving")
+		return errors.HandleError(c, err, "")
 	}
 
 	var response []responsemodels.UserResponse
@@ -104,5 +141,5 @@ func (h *UserHandler) GetAllUsers(c echo.Context) error {
 		response = append(response, responsemodels.ToUserResponse(u))
 	}
 
-	return utils.JSONResponse(c, http.StatusOK, "Successfully retrieved users", response)
+	return responsemodels.JSONResponse(c, http.StatusOK, "Successfully retrieved users", response)
 }
