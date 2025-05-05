@@ -46,6 +46,51 @@ go_blog/
 ├── go.mod # Go module file
 └── go.sum # Go module checksum
 ```
+
+## 🔐 Authentication
+
+This project uses **JWT** for stateless authentication.
+
+- `POST /v1/auth/register` – Register a new user
+- `POST /v1/auth/login` – Get JWT token
+- Protected routes require `Authorization: Bearer <token>` header
+
+---
+
+## 📚 API Endpoints
+
+### Public
+
+- `GET /` – Welcome message
+- `GET /v1/posts` – List all posts (paginated)
+- `GET /v1/posts/:id` – Get post by ID
+- `GET /swagger/*` – Swagger API documentation
+
+### Auth
+
+- `POST /v1/auth/register` – Register
+- `POST /v1/auth/login` – Login
+
+### Users (Protected)
+
+- `GET /v1/users` – List all users
+
+### Posts (Protected)
+
+- `POST /v1/posts` – Create a new post
+- `PATCH /v1/posts/:id` – Edit post
+- `DELETE /v1/posts/:id` – Delete post
+- `GET /v1/authors/:author_id/posts` – Get posts by author (paginated)
+
+### Categories (Protected)
+
+- `GET /v1/categories` – List all categories (paginated)
+- `POST /v1/categories` – Create a category
+- `DELETE /v1/categories/:id` – Delete a category
+
+---
+
+
 ## 🧪 Running Locally
 
 ### 1. Clone the repo
