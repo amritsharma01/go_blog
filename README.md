@@ -43,7 +43,7 @@ go_blog/
 ├── config/ # Configuration and environment setup
 ├── utils/ # Utility functions
 ├── docs/ # Swagger generated files
-└── go.mod # Go module file
+├── go.mod # Go module file
 └── go.sum # Go module checksum
 ```
 ## 🧪 Running Locally
@@ -73,6 +73,7 @@ JWT_SECRET=your_jwt_secret_key
 go mod tidy
 go run cmd/main.go
 ```
+#### Now the project is accessible at *localhost:8000*
 
 ## Swagger Documentation
 ### Swagger Documentation is availabe at 
