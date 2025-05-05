@@ -64,3 +64,9 @@ func (r *userRepository) FindByID(id uint) (*models.User, error) {
 	}
 	return &user, nil
 }
+
+func (r *userRepository) test() {
+	//aaaaaaaaaaaaaaaaaaa
+	//aaaaaaaaaaaaaaaaaaa
+	fmt.Println("Test")
+}
