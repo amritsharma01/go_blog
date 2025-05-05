@@ -27,8 +27,10 @@ A RESTful blog API built with **Go**, using **Echo** as the web framework and **
 ---
 
 ## 📁 Project Structure
+```
 go_blog/
-├── cmd/main.go # Entry point
+├── cmd/
+  └── main.go # Application entry point
 ├── handlers/ # HTTP layer (Echo handlers)
 ├── middleware/ # JWT and custom middleware
 ├── repositories/ # Data access layer
@@ -41,8 +43,9 @@ go_blog/
 ├── config/ # Configuration and environment setup
 ├── utils/ # Utility functions
 ├── docs/ # Swagger generated files
-└── go.mod / go.sum # Go module files
-
+└── go.mod # Go module file
+└── go.sum # Go module checksum
+```
 ## 🧪 Running Locally
 
 ### 1. Clone the repo
